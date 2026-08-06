@@ -142,7 +142,7 @@
 
   #metro-cdmx-morph .metro-tip-row {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 0.5rem;
     min-inline-size: 0;
     white-space: normal;
@@ -282,6 +282,11 @@
     cursor: crosshair;
   }
 
+  #metro-cdmx-morph [data-layer="badges"],
+  #metro-cdmx-morph [data-layer="mobility-badges"] {
+    pointer-events: none;
+  }
+
   #metro-cdmx-morph .mobility-station-hit {
     fill: transparent;
     cursor: crosshair;
@@ -396,8 +401,8 @@
       <text x="52" y="55" fill="#d6dce2" class="metro-map-note" font-size="12">23 LÍNEAS · 4 SISTEMAS</text>
     </svg>
     <div class="metro-zoom-controls" role="group" aria-label="Zoom del mapa">
+      <button class="metro-zoom-button" type="button" data-zoom="reset" aria-label="Restablecer zoom" title="Restablecer vista">↻</button>
       <button class="metro-zoom-button" type="button" data-zoom="out" aria-label="Alejar">−</button>
-      <button class="metro-zoom-button" type="button" data-zoom="reset" aria-label="Restablecer zoom">1:1</button>
       <button class="metro-zoom-button" type="button" data-zoom="in" aria-label="Acercar">+</button>
     </div>
     <span class="sr-only metro-zoom-status" aria-live="polite">Zoom 100%</span>
@@ -1559,6 +1564,20 @@
     const gap = routeLabel ? 2.5 : 0;
     const routeWidth = routeLabel ? (String(routeLabel).length > 1 ? 20 : 17) : 0;
     const totalWidth = iconSize + gap + routeWidth;
+    const clearance = 3;
+    const plateHeight = iconSize + clearance * 2;
+    const plate = svgNode("rect", {
+      class: "badge-clearance",
+      x: (-totalWidth / 2 - clearance).toFixed(2),
+      y: (-plateHeight / 2).toFixed(2),
+      width: (totalWidth + clearance * 2).toFixed(2),
+      height: plateHeight.toFixed(2),
+      rx: 3.8,
+      fill: "#05070a"
+    });
+    group.appendChild(plate);
+    group.setAttribute("data-badge-width", (totalWidth + clearance * 2).toFixed(2));
+    group.setAttribute("data-badge-height", plateHeight.toFixed(2));
     const icon = svgNode("image", {
       class: options.className || "metro-badge",
       x: (-totalWidth / 2).toFixed(2),
@@ -1614,6 +1633,8 @@
         group,
         endpoint: stationById.get(line.station_ids[endpointIndex]),
         neighbor: stationById.get(line.station_ids[neighborIndex]),
+        system: "metro",
+        lineId: line.id,
         distance: 24
       });
     });
@@ -1646,9 +1667,359 @@
           className: "mobility-badge"
         });
         mobilityBadgeLayer.appendChild(group);
-        mobilityBadgeRenderers.push({ group, endpoint, neighbor, distance: 22 });
+        mobilityBadgeRenderers.push({
+          group,
+          endpoint,
+          neighbor,
+          system: line.system,
+          lineId: line.id,
+          distance: 22
+        });
       });
   });
+
+  function normalizedNodeName(name) {
+    return String(name || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  }
+
+  const badgeSystemOrder = new Map([
+    ["metro", 0],
+    ["metrobus", 1],
+    ["cablebus", 2],
+    ["suburbano", 3]
+  ]);
+
+  function compareBadgeMembers(first, second) {
+    const systemDifference = (badgeSystemOrder.get(first.system) ?? 9)
+      - (badgeSystemOrder.get(second.system) ?? 9);
+    if (systemDifference) return systemDifference;
+    return String(first.lineId).localeCompare(String(second.lineId), "es", {
+      numeric: true,
+      sensitivity: "base"
+    });
+  }
+
+  const allBadgeRenderers = [...badgeRenderers, ...mobilityBadgeRenderers];
+  const badgeClustersByNode = new Map();
+  allBadgeRenderers.forEach(badge => {
+    badge.width = Number(badge.group.getAttribute("data-badge-width")) || 47;
+    badge.height = Number(badge.group.getAttribute("data-badge-height")) || 25;
+    badge.nodeKey = normalizedNodeName(badge.endpoint?.name);
+    if (!badgeClustersByNode.has(badge.nodeKey)) badgeClustersByNode.set(badge.nodeKey, []);
+    badgeClustersByNode.get(badge.nodeKey).push(badge);
+  });
+
+  const badgeClusters = [...badgeClustersByNode.entries()]
+    .map(([nodeKey, members]) => {
+      members.sort(compareBadgeMembers);
+      members.forEach((member, index) => {
+        member.group.setAttribute("data-node-key", nodeKey);
+        member.group.setAttribute("data-stack-index", String(index + 1));
+        member.group.setAttribute("data-stack-size", String(members.length));
+      });
+      return { nodeKey, members };
+    })
+    .sort((first, second) =>
+      second.members.length - first.members.length
+      || first.nodeKey.localeCompare(second.nodeKey, "es")
+    );
+
+  const reduceBadgeMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  let badgeAnimationFrame = 0;
+
+  function setRenderedBadgePosition(badge, position) {
+    badge.displayPosition = [...position];
+    badge.group.setAttribute(
+      "transform",
+      `translate(${position[0].toFixed(2)} ${position[1].toFixed(2)})`
+    );
+    badge.group.setAttribute("data-render-x", position[0].toFixed(2));
+    badge.group.setAttribute("data-render-y", position[1].toFixed(2));
+  }
+
+  function scheduleBadgePositionAnimation() {
+    if (reduceBadgeMotion) {
+      allBadgeRenderers.forEach(badge => {
+        if (badge.targetPosition) setRenderedBadgePosition(badge, badge.targetPosition);
+      });
+      return;
+    }
+    if (badgeAnimationFrame) return;
+    const animate = () => {
+      let remainsInMotion = false;
+      allBadgeRenderers.forEach(badge => {
+        if (!badge.targetPosition) return;
+        if (!badge.displayPosition) {
+          setRenderedBadgePosition(badge, badge.targetPosition);
+          return;
+        }
+        const dx = badge.targetPosition[0] - badge.displayPosition[0];
+        const dy = badge.targetPosition[1] - badge.displayPosition[1];
+        if (Math.hypot(dx, dy) <= 0.12) {
+          setRenderedBadgePosition(badge, badge.targetPosition);
+          return;
+        }
+        setRenderedBadgePosition(badge, [
+          badge.displayPosition[0] + dx * 0.32,
+          badge.displayPosition[1] + dy * 0.32
+        ]);
+        remainsInMotion = true;
+      });
+      badgeAnimationFrame = remainsInMotion ? requestAnimationFrame(animate) : 0;
+    };
+    badgeAnimationFrame = requestAnimationFrame(animate);
+  }
+
+  function segmentIntersectsRect(start, end, rect) {
+    if (
+      Math.max(start[0], end[0]) < rect.left
+      || Math.min(start[0], end[0]) > rect.right
+      || Math.max(start[1], end[1]) < rect.top
+      || Math.min(start[1], end[1]) > rect.bottom
+    ) return false;
+    let near = 0;
+    let far = 1;
+    const dx = end[0] - start[0];
+    const dy = end[1] - start[1];
+    const p = [-dx, dx, -dy, dy];
+    const q = [
+      start[0] - rect.left,
+      rect.right - start[0],
+      start[1] - rect.top,
+      rect.bottom - start[1]
+    ];
+    for (let index = 0; index < 4; index += 1) {
+      if (Math.abs(p[index]) < 1e-9) {
+        if (q[index] < 0) return false;
+        continue;
+      }
+      const ratio = q[index] / p[index];
+      if (p[index] < 0) near = Math.max(near, ratio);
+      else far = Math.min(far, ratio);
+      if (near > far) return false;
+    }
+    return true;
+  }
+
+  function rectanglesOverlap(first, second, gap = 0) {
+    return !(
+      first.right + gap <= second.left
+      || second.right + gap <= first.left
+      || first.bottom + gap <= second.top
+      || second.bottom + gap <= first.top
+    );
+  }
+
+  function angleDifference(first, second) {
+    return Math.abs(Math.atan2(Math.sin(first - second), Math.cos(first - second)));
+  }
+
+  function positionBadgeClusters(routePolylines) {
+    const routeSegments = [];
+    routePolylines.forEach(points => {
+      for (let index = 1; index < points.length; index += 1) {
+        routeSegments.push([points[index - 1], points[index]]);
+      }
+    });
+    const collisionCellSize = 40;
+    const routeSegmentGrid = new Map();
+    routeSegments.forEach((segment, segmentIndex) => {
+      const minX = Math.floor(Math.min(segment[0][0], segment[1][0]) / collisionCellSize);
+      const maxX = Math.floor(Math.max(segment[0][0], segment[1][0]) / collisionCellSize);
+      const minY = Math.floor(Math.min(segment[0][1], segment[1][1]) / collisionCellSize);
+      const maxY = Math.floor(Math.max(segment[0][1], segment[1][1]) / collisionCellSize);
+      for (let cellX = minX; cellX <= maxX; cellX += 1) {
+        for (let cellY = minY; cellY <= maxY; cellY += 1) {
+          const key = `${cellX}:${cellY}`;
+          if (!routeSegmentGrid.has(key)) routeSegmentGrid.set(key, []);
+          routeSegmentGrid.get(key).push(segmentIndex);
+        }
+      }
+    });
+
+    function rectIntersectsRoute(rect) {
+      const minX = Math.floor(rect.left / collisionCellSize);
+      const maxX = Math.floor(rect.right / collisionCellSize);
+      const minY = Math.floor(rect.top / collisionCellSize);
+      const maxY = Math.floor(rect.bottom / collisionCellSize);
+      const checkedSegments = new Set();
+      for (let cellX = minX; cellX <= maxX; cellX += 1) {
+        for (let cellY = minY; cellY <= maxY; cellY += 1) {
+          const candidates = routeSegmentGrid.get(`${cellX}:${cellY}`) || [];
+          for (const segmentIndex of candidates) {
+            if (checkedSegments.has(segmentIndex)) continue;
+            checkedSegments.add(segmentIndex);
+            const segment = routeSegments[segmentIndex];
+            if (segmentIntersectsRect(segment[0], segment[1], rect)) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    const placedRects = [];
+    const directions = Array.from({ length: 16 }, (_, index) => index * Math.PI / 8);
+    const radialOffsets = [0, 8, 18, 30, 45, 64, 88, 116, 148, 184];
+
+    badgeClusters.forEach(cluster => {
+      const node = cluster.members.reduce((total, member) => [
+        total[0] + member.endpoint.current[0],
+        total[1] + member.endpoint.current[1]
+      ], [0, 0]).map(value => value / cluster.members.length);
+
+      const outward = cluster.members.reduce((total, member) => {
+        const dx = member.endpoint.current[0] - member.neighbor.current[0];
+        const dy = member.endpoint.current[1] - member.neighbor.current[1];
+        const length = Math.hypot(dx, dy) || 1;
+        total[0] += dx / length;
+        total[1] += dy / length;
+        return total;
+      }, [0, 0]);
+      if (Math.hypot(outward[0], outward[1]) < 0.18) {
+        outward[0] = node[0] - 500;
+        outward[1] = node[1] - 395;
+      }
+      const preferredAngle = Math.atan2(outward[1], outward[0]);
+      const orderedDirections = directions
+        .map(angle => ({ angle, difference: angleDifference(angle, preferredAngle) }))
+        .sort((first, second) => first.difference - second.difference || first.angle - second.angle);
+
+      const stackGap = 3;
+      const stackWidth = Math.max(...cluster.members.map(member => member.width));
+      const stackHeight = cluster.members.reduce((sum, member) => sum + member.height, 0)
+        + stackGap * (cluster.members.length - 1);
+      const predictedCenter = cluster.lastCenter && cluster.lastNode ? [
+        cluster.lastCenter[0] + node[0] - cluster.lastNode[0],
+        cluster.lastCenter[1] + node[1] - cluster.lastNode[1]
+      ] : null;
+      const candidateCenters = [];
+      const seenCandidates = new Set();
+
+      function addCandidate(center, difference) {
+        const key = `${center[0].toFixed(2)}:${center[1].toFixed(2)}`;
+        if (seenCandidates.has(key)) return;
+        seenCandidates.add(key);
+        candidateCenters.push({ center, difference });
+      }
+
+      if (predictedCenter) {
+        const localRadii = [0, 4, 8, 12, 18, 26, 38, 54, 74, 100];
+        localRadii.forEach(localRadius => {
+          if (localRadius === 0) {
+            const angle = Math.atan2(predictedCenter[1] - node[1], predictedCenter[0] - node[0]);
+            addCandidate(predictedCenter, angleDifference(angle, preferredAngle));
+            return;
+          }
+          directions.forEach(angle => {
+            const center = [
+              predictedCenter[0] + Math.cos(angle) * localRadius,
+              predictedCenter[1] + Math.sin(angle) * localRadius
+            ];
+            const nodeAngle = Math.atan2(center[1] - node[1], center[0] - node[0]);
+            addCandidate(center, angleDifference(nodeAngle, preferredAngle));
+          });
+        });
+      }
+
+      orderedDirections.forEach(({ angle, difference }) => {
+        const ux = Math.cos(angle);
+        const uy = Math.sin(angle);
+        const baseRadius = 8 + Math.abs(ux) * stackWidth / 2 + Math.abs(uy) * stackHeight / 2;
+        radialOffsets.forEach(radialOffset => {
+          const radius = baseRadius + radialOffset;
+          addCandidate([node[0] + ux * radius, node[1] + uy * radius], difference);
+        });
+      });
+
+      let best = null;
+
+      candidateCenters.forEach(({ center, difference }) => {
+          const radius = Math.hypot(center[0] - node[0], center[1] - node[1]);
+          let cursorY = center[1] - stackHeight / 2;
+          const memberRects = cluster.members.map(member => {
+            const rect = {
+              left: center[0] - member.width / 2,
+              right: center[0] + member.width / 2,
+              top: cursorY,
+              bottom: cursorY + member.height,
+              member
+            };
+            cursorY = rect.bottom + stackGap;
+            return rect;
+          });
+
+          let boundaryOverflow = 0;
+          memberRects.forEach(rect => {
+            boundaryOverflow += Math.max(0, 8 - rect.left);
+            boundaryOverflow += Math.max(0, rect.right - 992);
+            boundaryOverflow += Math.max(0, 8 - rect.top);
+            boundaryOverflow += Math.max(0, rect.bottom - 782);
+          });
+
+          let lineCollisions = 0;
+          memberRects.forEach(rect => {
+            const clearanceRect = {
+              left: rect.left - 2.5,
+              right: rect.right + 2.5,
+              top: rect.top - 2.5,
+              bottom: rect.bottom + 2.5
+            };
+            if (rectIntersectsRoute(clearanceRect)) {
+              lineCollisions += 1;
+            }
+          });
+
+          let badgeCollisions = 0;
+          memberRects.forEach(rect => {
+            placedRects.forEach(placed => {
+              if (rectanglesOverlap(rect, placed, 3)) badgeCollisions += 1;
+            });
+          });
+
+          const movementDistance = predictedCenter
+            ? Math.hypot(center[0] - predictedCenter[0], center[1] - predictedCenter[1])
+            : 0;
+          const score = boundaryOverflow * 1e8
+            + badgeCollisions * 1e7
+            + lineCollisions * 1e6
+            + movementDistance * 40
+            + difference * 30
+            + radius * 0.05;
+          if (!best || score < best.score) {
+            best = {
+              score,
+              center,
+              memberRects,
+              boundaryOverflow,
+              badgeCollisions,
+              lineCollisions
+            };
+          }
+      });
+
+      cluster.lastCenter = [...best.center];
+      cluster.lastNode = [...node];
+      best.memberRects.forEach((rect, index) => {
+        const x = (rect.left + rect.right) / 2;
+        const y = (rect.top + rect.bottom) / 2;
+        rect.member.targetPosition = [x, y];
+        if (!rect.member.displayPosition) setRenderedBadgePosition(rect.member, rect.member.targetPosition);
+        rect.member.group.setAttribute("data-layout-x", x.toFixed(2));
+        rect.member.group.setAttribute("data-layout-y", y.toFixed(2));
+        rect.member.group.setAttribute("data-stack-position", `${index + 1}/${cluster.members.length}`);
+        rect.member.group.setAttribute("data-line-collisions", String(best.lineCollisions));
+        rect.member.group.setAttribute("data-badge-collisions", String(best.badgeCollisions));
+        rect.member.group.setAttribute("data-boundary-overflow", best.boundaryOverflow.toFixed(2));
+        placedRects.push(rect);
+      });
+    });
+    scheduleBadgePositionAnimation();
+  }
 
   function update(value) {
     const raw = clamp(value, 0, 1);
@@ -1681,6 +2052,10 @@
       station.group.setAttribute("transform", `translate(${station.current[0].toFixed(2)} ${station.current[1].toFixed(2)})`);
     });
 
+    const currentRoutePolylines = [];
+    if (officialSchematicOpacity > 0.02) {
+      officialPaths.forEach(path => currentRoutePolylines.push(path.mappedPoints));
+    }
     mobilityRouteRenderers.forEach(renderer => {
       renderer.parts.forEach(part => {
         const points = part.pairedPolyline
@@ -1703,6 +2078,7 @@
         const d = pathString(points);
         part.halo.setAttribute("d", d);
         part.visible.setAttribute("d", d);
+        currentRoutePolylines.push(points);
       });
     });
 
@@ -1720,25 +2096,10 @@
       const d = pathString(points);
       renderer.halo.setAttribute("d", d);
       renderer.paths.forEach(path => path.setAttribute("d", d));
+      currentRoutePolylines.push(points);
     });
 
-    badgeRenderers.forEach(badge => {
-      const dx = badge.endpoint.current[0] - badge.neighbor.current[0];
-      const dy = badge.endpoint.current[1] - badge.neighbor.current[1];
-      const length = Math.hypot(dx, dy) || 1;
-      const x = clamp(badge.endpoint.current[0] + dx / length * badge.distance, 23, 977);
-      const y = clamp(badge.endpoint.current[1] + dy / length * badge.distance, 13, 777);
-      badge.group.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
-    });
-
-    mobilityBadgeRenderers.forEach(badge => {
-      const dx = badge.endpoint.current[0] - badge.neighbor.current[0];
-      const dy = badge.endpoint.current[1] - badge.neighbor.current[1];
-      const length = Math.hypot(dx, dy) || 1;
-      const x = clamp(badge.endpoint.current[0] + dx / length * badge.distance, 23, 977);
-      const y = clamp(badge.endpoint.current[1] + dy / length * badge.distance, 13, 777);
-      badge.group.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
-    });
+    positionBadgeClusters(currentRoutePolylines);
 
     const percent = Math.round(raw * 100);
     const state = percent === 0 ? "Plano integrado" : percent === 100 ? "Geografía" : "Transición";
