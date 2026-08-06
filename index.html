@@ -804,6 +804,16 @@
   ]);
 
   function exactAdditionalSchematic(line, pathIndex) {
+    if (line.key === "suburbano-1" && pathIndex === 1) {
+      const main = officialPathById.get("suburbano-1-1")?.mappedPoints;
+      const branch = officialPathById.get("suburbano-aifa-2")?.mappedPoints;
+      if (!main || !branch) return null;
+      const junction = polylineIntersection(main, branch) || branch[0];
+      const junctionFraction = nearestProjectionOnPolyline(junction, branch).fraction;
+      const farFraction = junctionFraction < 0.5 ? 1 : 0;
+      return slicePolyline(branch, junctionFraction, farFraction);
+    }
+
     const direct = directOfficialBindings.get(`${line.key}:${pathIndex}`);
     if (direct) return joinOfficialPaths(direct);
 
@@ -1038,6 +1048,7 @@
       mapBox.top + station.sy * (mapBox.bottom - mapBox.top)
     ];
     const aligned = applyAffine(station.legacySchematic, schematicAlignment);
+    station.alignedSchematic = [...aligned];
     const snapped = nearestProjectionOnPaths(aligned, officialPathsForStation(station));
     station.schematic = snapped.path ? snapped.point : aligned;
     station.current = [...station.schematic];
@@ -1119,6 +1130,150 @@
       station.current = [...station.schematic];
     });
   }
+
+  function orientGuideToStationOrder(points, stationIds) {
+    const first = stationForId(stationIds[0]);
+    const last = stationForId(stationIds[stationIds.length - 1]);
+    if (!first || !last || points.length < 2) return points.map(point => [...point]);
+    const start = points[0];
+    const end = points[points.length - 1];
+    const direct = Math.hypot(first.schematic[0] - start[0], first.schematic[1] - start[1])
+      + Math.hypot(last.schematic[0] - end[0], last.schematic[1] - end[1]);
+    const reverse = Math.hypot(first.schematic[0] - end[0], first.schematic[1] - end[1])
+      + Math.hypot(last.schematic[0] - start[0], last.schematic[1] - start[1]);
+    return (reverse < direct ? [...points].reverse() : points).map(point => [...point]);
+  }
+
+  function warpPolylineEndpoints(points, from, to) {
+    if (!points || points.length < 2) return [[...from], [...to]];
+    const start = points[0];
+    const end = points[points.length - 1];
+    const sourceX = end[0] - start[0];
+    const sourceY = end[1] - start[1];
+    const sourceSquared = sourceX * sourceX + sourceY * sourceY;
+    if (sourceSquared < 1e-8) return [[...from], [...to]];
+    const targetX = to[0] - from[0];
+    const targetY = to[1] - from[1];
+    const real = (targetX * sourceX + targetY * sourceY) / sourceSquared;
+    const imaginary = (targetY * sourceX - targetX * sourceY) / sourceSquared;
+    return points.map(point => {
+      const localX = point[0] - start[0];
+      const localY = point[1] - start[1];
+      return [
+        from[0] + real * localX - imaginary * localY,
+        from[1] + imaginary * localX + real * localY
+      ];
+    });
+  }
+
+  function buildUniformSchematicLayout() {
+    const proposals = new Map();
+    const constraints = [];
+
+    function addProposal(stationId, point) {
+      if (!proposals.has(stationId)) proposals.set(stationId, []);
+      proposals.get(stationId).push(point);
+    }
+
+    function registerRoute(routeKey, stationIds, sourceGuide, fixedStep = null) {
+      if (!sourceGuide || sourceGuide.length < 2 || stationIds.length < 2) return null;
+      const guide = orientGuideToStationOrder(sourceGuide, stationIds);
+      const fractions = stationIds.map((_, index) => index / (stationIds.length - 1));
+      const guideLength = polylineMetrics(guide).total;
+      const step = fixedStep || guideLength / (stationIds.length - 1);
+
+      stationIds.forEach((stationId, index) => {
+        addProposal(stationId, pointAlongPolyline(guide, fractions[index]));
+        if (index === 0) return;
+        constraints.push({
+          from: stationIds[index - 1],
+          to: stationId,
+          routeKey,
+          target: step
+        });
+      });
+      return { guide, fractions, step };
+    }
+
+    data.lines.forEach(line => {
+      const officialGuide = officialPaths.find(path =>
+        path.system === "metro" && path.line === line.id
+      )?.mappedPoints;
+      const registered = registerRoute(`metro-${line.id}`, line.station_ids, officialGuide);
+      if (!registered) return;
+      line.schematicGuide = registered.guide;
+      line.schematicFractions = registered.fractions;
+      line.schematicStep = registered.step;
+    });
+
+    data.additionalLines.forEach(line => {
+      line.paths.forEach((pathData, pathIndex) => {
+        const officialGuide = exactAdditionalSchematic(line, pathIndex);
+        const fallbackGuide = pathData.station_ids.map(stationId => {
+          const station = stationForId(stationId);
+          return station?.alignedSchematic || station?.schematic || [0, 0];
+        });
+        const registered = registerRoute(
+          `${line.key}:${pathIndex}`,
+          pathData.station_ids,
+          officialGuide || fallbackGuide,
+          line.key === "metrobus-4" ? 13.5 : null
+        );
+        if (!registered) return;
+        pathData.schematicGuide = registered.guide;
+        pathData.schematicFractions = registered.fractions;
+        pathData.schematicStep = registered.step;
+        pathData.usesOfficialGuide = Boolean(officialGuide);
+      });
+    });
+
+    const initial = new Map();
+    [...stationById, ...mobilityStationById].forEach(([stationId, station]) => {
+      const stationProposals = proposals.get(stationId) || [station.schematic];
+      initial.set(stationId, [
+        stationProposals.reduce((sum, point) => sum + point[0], 0) / stationProposals.length,
+        stationProposals.reduce((sum, point) => sum + point[1], 0) / stationProposals.length
+      ]);
+    });
+
+    const positions = new Map(
+      [...initial].map(([stationId, point]) => [stationId, [...point]])
+    );
+    const iterations = 5000;
+    const anchorStrength = 0.00001;
+    for (let iteration = 0; iteration < iterations; iteration += 1) {
+      const relaxation = 0.44 * (1 - iteration / 6200);
+      constraints.forEach(constraint => {
+        const from = positions.get(constraint.from);
+        const to = positions.get(constraint.to);
+        if (!from || !to) return;
+        let dx = to[0] - from[0];
+        let dy = to[1] - from[1];
+        const distance = Math.hypot(dx, dy) || 1;
+        const correction = (distance - constraint.target) * relaxation * 0.5;
+        dx /= distance;
+        dy /= distance;
+        from[0] += dx * correction;
+        from[1] += dy * correction;
+        to[0] -= dx * correction;
+        to[1] -= dy * correction;
+      });
+      positions.forEach((point, stationId) => {
+        const anchor = initial.get(stationId);
+        point[0] += (anchor[0] - point[0]) * anchorStrength;
+        point[1] += (anchor[1] - point[1]) * anchorStrength;
+      });
+    }
+
+    [...stationById, ...mobilityStationById].forEach(([stationId, station]) => {
+      const point = positions.get(stationId);
+      if (!point) return;
+      station.schematic = [...point];
+      station.current = [...point];
+    });
+  }
+
+  buildUniformSchematicLayout();
 
   const gridLayer = root.querySelector('[data-layer="schematic-grid"]');
   gridLayer.setAttribute("opacity", "0");
@@ -1274,20 +1429,27 @@
         ? { width: 3.0, halo: 6.5, dash: null }
         : { width: 3.15, halo: 6.6, dash: null };
     const parts = line.paths.map((pathData, pathIndex) => {
-      const exactSchematic = exactAdditionalSchematic(line, pathIndex);
-      const pairedPolyline = exactSchematic && exactSchematic.length > 1
-        ? pairPolylines(exactSchematic, geographicPointsForPath(pathData))
-        : null;
-      const pairedSegments = pairedPolyline ? [] : pathData.segments.map((segment, segmentIndex) => {
+      const pairedSegments = pathData.segments.map((segment, segmentIndex) => {
           const from = stationForId(pathData.station_ids[segmentIndex]);
           const to = stationForId(pathData.station_ids[segmentIndex + 1]);
-          const geoPoints = segment.map(point => projection(point));
-          const fractions = fractionsAlong(geoPoints);
-          const schematicGuide = octolinearConnection(from.schematic, to.schematic);
-          return geoPoints.map((geoPoint, pointIndex) => ({
-            geo: geoPoint,
-            schematic: pointAlongPolyline(schematicGuide, fractions[pointIndex])
-          }));
+          const geoPoints = warpPolylineEndpoints(
+            segment.map(point => projection(point)),
+            from.geo,
+            to.geo
+          );
+          const startFraction = pathData.schematicFractions?.[segmentIndex];
+          const endFraction = pathData.schematicFractions?.[segmentIndex + 1];
+          const sourceGuide = pathData.usesOfficialGuide && pathData.schematicGuide
+            && Number.isFinite(startFraction)
+            && Number.isFinite(endFraction)
+            ? slicePolyline(pathData.schematicGuide, startFraction, endFraction)
+            : [from.schematic, to.schematic];
+          const schematicGuide = warpPolylineEndpoints(
+            sourceGuide,
+            from.schematic,
+            to.schematic
+          );
+          return pairPolylines(schematicGuide, geoPoints);
         });
 
       const halo = svgNode("path", {
@@ -1309,7 +1471,8 @@
       if (style.dash) visible.setAttribute("stroke-dasharray", style.dash);
       mobilityHalosLayer.appendChild(halo);
       mobilityLinesLayer.appendChild(visible);
-      return { pathData, pairedSegments, pairedPolyline, halo, visible };
+      visible.setAttribute("data-route", `${line.key}:${pathIndex}`);
+      return { pathData, pairedSegments, halo, visible };
     });
     mobilityRouteRenderers.push({ line, parts });
   });
@@ -1319,28 +1482,24 @@
   const lineRenderers = [];
 
   data.lines.forEach(line => {
-    const officialMetroPath = officialPaths.find(path =>
-      path.system === "metro" && path.line === line.id
-    );
     const pairedSegments = line.segments.map((segment, segmentIndex) => {
       const from = stationById.get(line.station_ids[segmentIndex]);
       const to = stationById.get(line.station_ids[segmentIndex + 1]);
-      const geoPoints = segment.map(point => projection(point));
-      if (!officialMetroPath) {
-        return pairPolylines([from.schematic, to.schematic], geoPoints);
-      }
-      const startFraction = nearestProjectionOnPolyline(
+      const geoPoints = warpPolylineEndpoints(
+        segment.map(point => projection(point)),
+        from.geo,
+        to.geo
+      );
+      const startFraction = line.schematicFractions?.[segmentIndex];
+      const endFraction = line.schematicFractions?.[segmentIndex + 1];
+      const sourceGuide = line.schematicGuide && Number.isFinite(startFraction)
+        && Number.isFinite(endFraction)
+        ? slicePolyline(line.schematicGuide, startFraction, endFraction)
+        : [from.schematic, to.schematic];
+      const schematicPoints = warpPolylineEndpoints(
+        sourceGuide,
         from.schematic,
-        officialMetroPath.mappedPoints
-      ).fraction;
-      const endFraction = nearestProjectionOnPolyline(
-        to.schematic,
-        officialMetroPath.mappedPoints
-      ).fraction;
-      const schematicPoints = slicePolyline(
-        officialMetroPath.mappedPoints,
-        startFraction,
-        endFraction
+        to.schematic
       );
       return pairPolylines(schematicPoints, geoPoints);
     });
@@ -1378,6 +1537,7 @@
       linesLayer.appendChild(path);
       paths.push(path);
     }
+    paths.forEach(path => path.setAttribute("data-route", `metro-${line.id}`));
     lineRenderers.push({ line, pairedSegments, halo, paths });
   });
 
@@ -2065,8 +2225,8 @@
     edomexLabelsLayer.setAttribute("opacity", (0.9 * labelOpacity).toFixed(3));
     roadsLayer.setAttribute("opacity", roadOpacity.toFixed(3));
     root.querySelector('[data-layer="north"]').setAttribute("opacity", baseOpacity.toFixed(3));
-    const mobilityMorphOpacity = smootherstep(raw / 0.18);
-    const officialSchematicOpacity = 1 - mobilityMorphOpacity;
+    const mobilityMorphOpacity = 1;
+    const officialSchematicOpacity = 0;
     officialSchematicHalosLayer.setAttribute("opacity", officialSchematicOpacity.toFixed(3));
     officialSchematicLinesLayer.setAttribute("opacity", officialSchematicOpacity.toFixed(3));
     mobilityHalosLayer.setAttribute("opacity", mobilityMorphOpacity.toFixed(3));
@@ -2085,28 +2245,18 @@
     });
 
     const currentRoutePolylines = [];
-    if (officialSchematicOpacity > 0.02) {
-      officialPaths.forEach(path => currentRoutePolylines.push(path.mappedPoints));
-    }
     mobilityRouteRenderers.forEach(renderer => {
       renderer.parts.forEach(part => {
-        const points = part.pairedPolyline
-          ? part.pairedPolyline.map(pair => [
+        const points = [];
+        part.pairedSegments.forEach((segment, segmentIndex) => {
+          segment.forEach((pair, pointIndex) => {
+            if (segmentIndex > 0 && pointIndex === 0) return;
+            points.push([
               pair.schematic[0] + (pair.geo[0] - pair.schematic[0]) * t,
               pair.schematic[1] + (pair.geo[1] - pair.schematic[1]) * t
-            ])
-          : [];
-        if (!part.pairedPolyline) {
-          part.pairedSegments.forEach((segment, segmentIndex) => {
-            segment.forEach((pair, pointIndex) => {
-              if (segmentIndex > 0 && pointIndex === 0) return;
-              points.push([
-                pair.schematic[0] + (pair.geo[0] - pair.schematic[0]) * t,
-                pair.schematic[1] + (pair.geo[1] - pair.schematic[1]) * t
-              ]);
-            });
+            ]);
           });
-        }
+        });
         const d = pathString(points);
         part.halo.setAttribute("d", d);
         part.visible.setAttribute("d", d);
