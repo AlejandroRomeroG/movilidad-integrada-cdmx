@@ -4,18 +4,45 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#05070a">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="dark light">
   <meta name="author" content="Alejandro Romero González">
   <meta name="description" content="Mapa interactivo de la Movilidad Integrada de la Ciudad de México: del mapa esquemático a la geografía real.">
   <title>Movilidad Integrada CDMX</title>
+  <script>
+    (() => {
+      try {
+        if (localStorage.getItem("movilidad-integrada-cdmx-theme") === "light") {
+          document.documentElement.dataset.mobilityTheme = "light";
+          document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#ffffff");
+        }
+      } catch {}
+    })();
+  </script>
   <style>
     * { box-sizing: border-box; }
 
     html {
+      --page-background: #05070a;
+      --page-foreground: #f4f7fa;
+      --page-muted: #9ba5af;
+      --page-aura: rgba(74, 89, 104, 0.16);
+      --dock-solid: #05070a;
+      --dock-fade: rgba(5, 7, 10, 0.95);
       height: 100%;
-      background: #05070a;
-      color: #f4f7fa;
+      background: var(--page-background);
+      color: var(--page-foreground);
+      color-scheme: dark;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    html[data-mobility-theme="light"] {
+      --page-background: #ffffff;
+      --page-foreground: #151a20;
+      --page-muted: #5d6873;
+      --page-aura: rgba(92, 116, 140, 0.1);
+      --dock-solid: #ffffff;
+      --dock-fade: rgba(255, 255, 255, 0.95);
+      color-scheme: light;
     }
 
     body {
@@ -26,8 +53,8 @@
       margin: 0;
       overflow: hidden;
       background:
-        radial-gradient(circle at 50% -20%, rgba(74, 89, 104, 0.16), transparent 38rem),
-        #05070a;
+        radial-gradient(circle at 50% -20%, var(--page-aura), transparent 38rem),
+        var(--page-background);
     }
 
     .site-shell {
@@ -62,7 +89,7 @@
     .site-header p {
       max-width: 38rem;
       margin: 0;
-      color: #9ba5af;
+      color: var(--page-muted);
       font-size: clamp(0.78rem, 1.45vw, 0.94rem);
       text-align: right;
     }
@@ -105,7 +132,7 @@
       padding-right: max(var(--page-gutter), env(safe-area-inset-right));
       padding-bottom: calc(0.65rem + env(safe-area-inset-bottom));
       padding-left: max(var(--page-gutter), env(safe-area-inset-left));
-      background: linear-gradient(to top, #05070a 72%, rgba(5, 7, 10, 0.95));
+      background: linear-gradient(to top, var(--dock-solid) 72%, var(--dock-fade));
     }
 
     @media (max-width: 680px) {
@@ -145,6 +172,11 @@
       .site-main #metro-cdmx-morph .metro-zoom-controls {
         top: 0;
         right: max(0.5rem, env(safe-area-inset-right));
+      }
+
+      .site-main #metro-cdmx-morph .metro-theme-button {
+        top: 0;
+        left: max(0.5rem, env(safe-area-inset-left));
       }
 
       .site-main #metro-cdmx-morph .metro-network-count {
@@ -188,10 +220,56 @@
     <main class="site-main">
       <style>
   #metro-cdmx-morph {
+    --map-background: #05070a;
+    --map-foreground: #f4f7fa;
+    --map-muted: #9ba5af;
+    --map-tooltip-foreground: #f7f9fb;
+    --map-tooltip-background: rgba(30, 34, 39, 0.97);
+    --map-tooltip-border: rgba(255, 255, 255, 0.16);
+    --map-tooltip-shadow: rgba(0, 0, 0, 0.38);
+    --map-button-background: rgba(17, 21, 26, 0.96);
+    --map-button-hover: rgba(45, 52, 60, 0.96);
+    --map-button-border: rgba(255, 255, 255, 0.2);
+    --map-focus: #ffffff;
+    --map-administrative-fill: #0a0e13;
+    --map-administrative-stroke: #46505b;
+    --map-road: #27303a;
+    --map-label: #8d99a5;
+    --map-note: #d6dce2;
+    --map-halo: #05070a;
+    --map-station-fill: #05070a;
+    --map-station-stroke: #f4f7fa;
+    --map-badge-clearance: #05070a;
     width: 100%;
-    color: #f4f7fa;
-    background: #05070a;
+    color: var(--map-foreground);
+    color-scheme: dark;
+    background: var(--map-background);
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  #metro-cdmx-morph[data-theme="light"],
+  html[data-mobility-theme="light"] #metro-cdmx-morph {
+    --map-background: #ffffff;
+    --map-foreground: #151a20;
+    --map-muted: #5d6873;
+    --map-tooltip-foreground: #151a20;
+    --map-tooltip-background: rgba(255, 255, 255, 0.98);
+    --map-tooltip-border: rgba(21, 26, 32, 0.2);
+    --map-tooltip-shadow: rgba(35, 43, 51, 0.18);
+    --map-button-background: rgba(255, 255, 255, 0.96);
+    --map-button-hover: #e9eef2;
+    --map-button-border: rgba(21, 26, 32, 0.24);
+    --map-focus: #111820;
+    --map-administrative-fill: #dfe5ea;
+    --map-administrative-stroke: #81909e;
+    --map-road: #b8c2cb;
+    --map-label: #53606d;
+    --map-note: #4f5a65;
+    --map-halo: #cfd6dc;
+    --map-station-fill: #ffffff;
+    --map-station-stroke: #182028;
+    --map-badge-clearance: #ffffff;
+    color-scheme: light;
   }
 
   #metro-cdmx-morph .metro-stage {
@@ -201,7 +279,7 @@
     contain: layout paint;
     touch-action: none;
     overscroll-behavior: contain;
-    background: #05070a;
+    background: var(--map-background);
   }
 
   #metro-cdmx-morph .metro-map {
@@ -230,11 +308,11 @@
     inline-size: max-content;
     max-inline-size: min(22rem, calc(100% - 1rem));
     padding: 0.48rem 0.62rem;
-    color: #f7f9fb;
-    background: rgba(30, 34, 39, 0.97);
-    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: var(--map-tooltip-foreground);
+    background: var(--map-tooltip-background);
+    border: 1px solid var(--map-tooltip-border);
     border-radius: 0.55rem;
-    box-shadow: 0 0.55rem 1.4rem rgba(0, 0, 0, 0.38);
+    box-shadow: 0 0.55rem 1.4rem var(--map-tooltip-shadow);
     font-size: 0.84rem;
   }
 
@@ -267,7 +345,7 @@
     width: 100%;
     min-height: 1.7rem;
     margin: 0;
-    accent-color: #f4f7fa;
+    accent-color: var(--map-foreground);
   }
 
   #metro-cdmx-morph .viz-controls {
@@ -296,7 +374,14 @@
   }
 
   #metro-cdmx-morph .text-muted {
-    color: #9ba5af;
+    color: var(--map-muted);
+  }
+
+  #metro-cdmx-morph .metro-theme-button {
+    position: absolute;
+    top: 0.8rem;
+    left: 0.8rem;
+    z-index: 3;
   }
 
   #metro-cdmx-morph .metro-zoom-controls {
@@ -309,33 +394,61 @@
     gap: 0.35rem;
   }
 
-  #metro-cdmx-morph .metro-zoom-button {
+  #metro-cdmx-morph .metro-zoom-button,
+  #metro-cdmx-morph .metro-theme-button {
     display: inline-grid;
     min-width: 2.35rem;
     height: 2.35rem;
     place-items: center;
     padding: 0 0.55rem;
-    color: #f4f7fa;
-    background: rgba(17, 21, 26, 0.96);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--map-foreground);
+    background: var(--map-button-background);
+    border: 1px solid var(--map-button-border);
     border-radius: 0.45rem;
     font: inherit;
     font-weight: 500;
     cursor: pointer;
   }
 
-  #metro-cdmx-morph .metro-zoom-button:hover {
-    background: rgba(45, 52, 60, 0.96);
+  #metro-cdmx-morph .metro-zoom-button:hover,
+  #metro-cdmx-morph .metro-theme-button:hover {
+    background: var(--map-button-hover);
   }
 
-  #metro-cdmx-morph .metro-zoom-button:focus-visible {
-    outline: 2px solid #ffffff;
+  #metro-cdmx-morph .metro-zoom-button:focus-visible,
+  #metro-cdmx-morph .metro-theme-button:focus-visible {
+    outline: 2px solid var(--map-focus);
     outline-offset: 2px;
   }
 
   #metro-cdmx-morph .metro-zoom-button:disabled {
     opacity: 0.42;
     cursor: default;
+  }
+
+  #metro-cdmx-morph .metro-theme-icon {
+    display: block;
+    width: 1.1rem;
+    height: 1.1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  #metro-cdmx-morph .metro-theme-icon-moon {
+    display: none;
+  }
+
+  #metro-cdmx-morph[data-theme="light"] .metro-theme-icon-sun,
+  html[data-mobility-theme="light"] #metro-cdmx-morph .metro-theme-icon-sun {
+    display: none;
+  }
+
+  #metro-cdmx-morph[data-theme="light"] .metro-theme-icon-moon,
+  html[data-mobility-theme="light"] #metro-cdmx-morph .metro-theme-icon-moon {
+    display: block;
   }
 
   #metro-cdmx-morph .sr-only {
@@ -399,6 +512,7 @@
     font-family: ui-sans-serif, system-ui, sans-serif;
     font-weight: 500;
     letter-spacing: 0.08em;
+    fill: var(--map-note);
   }
 
   #metro-cdmx-morph .metro-stage[data-interacting="true"] .metro-line,
@@ -414,6 +528,56 @@
     letter-spacing: 0.05em;
     text-anchor: middle;
     paint-order: stroke;
+    fill: var(--map-label);
+    stroke: var(--map-background);
+  }
+
+  #metro-cdmx-morph .metro-map-background {
+    fill: var(--map-background);
+  }
+
+  #metro-cdmx-morph .metro-administrative-boundary {
+    fill: var(--map-administrative-fill);
+    stroke: var(--map-administrative-stroke);
+  }
+
+  #metro-cdmx-morph .metro-road {
+    stroke: var(--map-road);
+  }
+
+  #metro-cdmx-morph .official-schematic-halo,
+  #metro-cdmx-morph .mobility-halo,
+  #metro-cdmx-morph .metro-halo {
+    stroke: var(--map-halo);
+  }
+
+  #metro-cdmx-morph .mobility-station-mark {
+    fill: var(--map-station-fill);
+  }
+
+  #metro-cdmx-morph .metro-station-dot {
+    fill: var(--map-station-fill);
+    stroke: var(--map-station-stroke);
+  }
+
+  #metro-cdmx-morph .badge-clearance {
+    fill: var(--map-badge-clearance);
+  }
+
+  #metro-cdmx-morph [data-layer="north"] path,
+  #metro-cdmx-morph [data-layer="north"] text {
+    fill: var(--map-note);
+  }
+
+  #metro-cdmx-morph[data-theme="light"] .metro-line,
+  #metro-cdmx-morph[data-theme="light"] .metro-b-line,
+  #metro-cdmx-morph[data-theme="light"] .official-schematic-line,
+  #metro-cdmx-morph[data-theme="light"] .mobility-line,
+  html[data-mobility-theme="light"] #metro-cdmx-morph .metro-line,
+  html[data-mobility-theme="light"] #metro-cdmx-morph .metro-b-line,
+  html[data-mobility-theme="light"] #metro-cdmx-morph .official-schematic-line,
+  html[data-mobility-theme="light"] #metro-cdmx-morph .mobility-line {
+    filter: none;
   }
 
   @media (max-width: 680px) and (orientation: portrait) {
@@ -441,12 +605,24 @@
       right: 0.5rem;
     }
 
-    #metro-cdmx-morph .metro-zoom-button {
+    #metro-cdmx-morph .metro-theme-button {
+      top: 0.5rem;
+      left: 0.5rem;
+    }
+
+    #metro-cdmx-morph .metro-zoom-button,
+    #metro-cdmx-morph .metro-theme-button {
       min-width: 2.1rem;
       height: 2.1rem;
       padding-inline: 0.4rem;
     }
 
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    #metro-cdmx-morph .metro-network-count {
+      display: none;
+    }
   }
 </style>
 
@@ -461,7 +637,7 @@
     >
       <title id="metro-cdmx-title">Movilidad Integrada de la Ciudad de México</title>
       <desc id="metro-cdmx-desc">Mapa interactivo que interpola entre un mapa esquemático y la geografía real del Metro, las siete líneas de Metrobús, las tres líneas de Cablebús y el Tren Suburbano con su ramal al AIFA.</desc>
-      <rect width="1000" height="790" fill="#05070a"></rect>
+      <rect class="metro-map-background" width="1000" height="790" fill="#05070a"></rect>
       <defs>
         <clipPath id="metro-cdmx-context-clip">
           <rect x="0" y="0" width="1000" height="790"></rect>
@@ -502,8 +678,17 @@
         <path d="M946 72 L956 94 L946 88 L936 94 Z" fill="#d6dce2"></path>
         <text x="946" y="63" text-anchor="middle" fill="#d6dce2" class="metro-map-note" font-size="11">N</text>
       </g>
-      <text x="52" y="55" fill="#d6dce2" class="metro-map-note metro-network-count" font-size="12">23 LÍNEAS · 4 SISTEMAS</text>
+      <text x="90" y="55" fill="#d6dce2" class="metro-map-note metro-network-count" font-size="12">23 LÍNEAS · 4 SISTEMAS</text>
     </svg>
+    <button class="metro-theme-button" type="button" aria-label="Cambiar a tema claro" title="Cambiar a tema claro">
+      <svg class="metro-theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <g class="metro-theme-icon-sun">
+          <circle cx="12" cy="12" r="3.5"></circle>
+          <path d="M12 2v2 M12 20v2 M4.93 4.93l1.42 1.42 M17.65 17.65l1.42 1.42 M2 12h2 M20 12h2 M4.93 19.07l1.42-1.42 M17.65 6.35l1.42-1.42"></path>
+        </g>
+        <path class="metro-theme-icon-moon" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"></path>
+      </svg>
+    </button>
     <div class="metro-zoom-controls" role="group" aria-label="Zoom del mapa">
       <button class="metro-zoom-button" type="button" data-zoom="reset" aria-label="Restablecer zoom" title="Restablecer vista">↻</button>
       <button class="metro-zoom-button" type="button" data-zoom="out" aria-label="Alejar">−</button>
@@ -656,10 +841,51 @@
   const stage = root.querySelector(".metro-stage");
   const slider = root.querySelector("#metro-cdmx-range");
   const tip = root.querySelector(".metro-tip");
+  const themeButton = root.querySelector(".metro-theme-button");
   const zoomGroup = root.querySelector('[data-layer="zoomable"]');
   const zoomStatus = root.querySelector(".metro-zoom-status");
   const zoomButtons = [...root.querySelectorAll(".metro-zoom-button")];
   const ns = "http://www.w3.org/2000/svg";
+  const themeStorageKey = "movilidad-integrada-cdmx-theme";
+  const isStandaloneSite = Boolean(root.closest(".site-main")?.closest(".site-shell"));
+
+  function storedTheme() {
+    if (!isStandaloneSite) return null;
+    try {
+      const value = localStorage.getItem(themeStorageKey);
+      return value === "light" || value === "dark" ? value : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function applyTheme(value, persist = false) {
+    const theme = value === "light" ? "light" : "dark";
+    const nextThemeName = theme === "light" ? "oscuro" : "claro";
+    root.dataset.theme = theme;
+    document.documentElement.dataset.mobilityTheme = theme;
+    themeButton.setAttribute("aria-label", `Cambiar a tema ${nextThemeName}`);
+    themeButton.setAttribute("title", `Cambiar a tema ${nextThemeName}`);
+    if (isStandaloneSite) {
+      document.querySelector('meta[name="theme-color"]')?.setAttribute(
+        "content",
+        theme === "light" ? "#ffffff" : "#05070a"
+      );
+      if (persist) {
+        try {
+          localStorage.setItem(themeStorageKey, theme);
+        } catch {}
+      }
+    }
+  }
+
+  const initialTheme = storedTheme()
+    || (document.documentElement.dataset.mobilityTheme === "light" ? "light" : "dark");
+  applyTheme(initialTheme);
+  themeButton.addEventListener("click", () => {
+    applyTheme(root.dataset.theme === "light" ? "dark" : "light", true);
+  });
+
   const mapBox = { left: 55, top: 48, right: 945, bottom: 768 };
   const officialColors = {
     "1": "#F55197", "2": "#005DB9", "3": "#B19800", "4": "#66BBB0",
@@ -1676,6 +1902,7 @@
 
   const boroughLayer = root.querySelector('[data-layer="boroughs"]');
   const boroughPath = svgNode("path", {
+    class: "metro-administrative-boundary",
     d: geoPathMaker(data.boroughs) || "",
     ...administrativeBoundaryStyle
   });
@@ -1683,6 +1910,7 @@
 
   const edomexLayer = root.querySelector('[data-layer="edomex"]');
   const edomexPath = svgNode("path", {
+    class: "metro-administrative-boundary",
     d: geoPathMaker(data.edomex) || "",
     ...administrativeBoundaryStyle
   });
@@ -1708,6 +1936,7 @@
 
   const roadsLayer = root.querySelector('[data-layer="roads"]');
   const roadsPath = svgNode("path", {
+    class: "metro-road",
     d: geoPathMaker(data.roads) || "",
     fill: "none",
     stroke: "#27303a",
