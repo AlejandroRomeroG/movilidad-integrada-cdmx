@@ -125,6 +125,22 @@
 
     }
 
+    @media (max-width: 680px) and (orientation: portrait) {
+      .site-main {
+        width: 100vw;
+        margin-inline: calc(50% - 50vw);
+      }
+
+      .site-main #metro-cdmx-morph .metro-stage {
+        width: min(100cqw, 91.310cqh);
+        aspect-ratio: 704 / 771;
+      }
+
+      .site-main #metro-cdmx-morph .metro-network-count {
+        display: none;
+      }
+    }
+
     @media (max-height: 500px) and (orientation: landscape) {
       .site-shell {
         --page-gutter: 0.45rem;
@@ -166,6 +182,8 @@
     width: 100%;
     overflow: hidden;
     contain: layout paint;
+    touch-action: none;
+    overscroll-behavior: contain;
     background: #05070a;
   }
 
@@ -366,14 +384,10 @@
     letter-spacing: 0.08em;
   }
 
-  #metro-cdmx-morph .metro-stage[data-panning="true"] .metro-line,
-  #metro-cdmx-morph .metro-stage[data-panning="true"] .metro-b-line,
-  #metro-cdmx-morph .metro-stage[data-panning="true"] .official-schematic-line,
-  #metro-cdmx-morph .metro-stage[data-panning="true"] .mobility-line,
-  #metro-cdmx-morph .metro-stage[data-zooming="true"] .metro-line,
-  #metro-cdmx-morph .metro-stage[data-zooming="true"] .metro-b-line,
-  #metro-cdmx-morph .metro-stage[data-zooming="true"] .official-schematic-line,
-  #metro-cdmx-morph .metro-stage[data-zooming="true"] .mobility-line {
+  #metro-cdmx-morph .metro-stage[data-interacting="true"] .metro-line,
+  #metro-cdmx-morph .metro-stage[data-interacting="true"] .metro-b-line,
+  #metro-cdmx-morph .metro-stage[data-interacting="true"] .official-schematic-line,
+  #metro-cdmx-morph .metro-stage[data-interacting="true"] .mobility-line {
     filter: none;
   }
 
@@ -383,6 +397,20 @@
     letter-spacing: 0.05em;
     text-anchor: middle;
     paint-order: stroke;
+  }
+
+  @media (max-width: 680px) and (orientation: portrait) {
+    #metro-cdmx-morph .metro-stage {
+      aspect-ratio: 704 / 771;
+    }
+
+    #metro-cdmx-morph .metro-map {
+      height: 100%;
+    }
+
+    #metro-cdmx-morph .metro-network-count {
+      display: none;
+    }
   }
 
   @media (max-width: 480px) {
@@ -457,7 +485,7 @@
         <path d="M946 72 L956 94 L946 88 L936 94 Z" fill="#d6dce2"></path>
         <text x="946" y="63" text-anchor="middle" fill="#d6dce2" class="metro-map-note" font-size="11">N</text>
       </g>
-      <text x="52" y="55" fill="#d6dce2" class="metro-map-note" font-size="12">23 LÍNEAS · 4 SISTEMAS</text>
+      <text x="52" y="55" fill="#d6dce2" class="metro-map-note metro-network-count" font-size="12">23 LÍNEAS · 4 SISTEMAS</text>
     </svg>
     <div class="metro-zoom-controls" role="group" aria-label="Zoom del mapa">
       <button class="metro-zoom-button" type="button" data-zoom="reset" aria-label="Restablecer zoom" title="Restablecer vista">↻</button>
@@ -656,41 +684,139 @@
     return t * t * t * (t * (t * 6 - 15) + 10);
   }
 
+  const fullCameraFrame = { x: 0, y: 0, width: 1000, height: 790 };
+  const portraitSchemeFrame = { x: 148, y: 20, width: 704, height: 771 };
+  const portraitGeographyFrame = { x: 10, y: -56, width: 816, height: 894 };
+  const portraitCameraQuery = window.matchMedia("(max-width: 680px) and (orientation: portrait)");
+  const northLayer = root.querySelector('[data-layer="north"]');
   const zoomState = { scale: 1, x: 0, y: 0 };
+  let cameraFrame = { ...fullCameraFrame };
+  let currentMorphValue = 0;
   let zoomRenderFrame = 0;
   let renderedZoomPercent = -1;
-  let mapClientRect = null;
+  let mapScreenInverse = null;
   let wheelEndTimer = 0;
 
-  function invalidateMapClientRect() {
-    mapClientRect = null;
+  function invalidateMapGeometry() {
+    mapScreenInverse = null;
   }
 
-  function currentMapClientRect() {
-    if (!mapClientRect) {
-      const rect = svg.getBoundingClientRect();
-      mapClientRect = {
-        left: rect.left,
-        top: rect.top,
-        width: rect.width,
-        height: rect.height
-      };
+  function currentMapInverse() {
+    if (!mapScreenInverse) {
+      const matrix = svg.getScreenCTM();
+      if (matrix) mapScreenInverse = matrix.inverse();
     }
-    return mapClientRect;
+    return mapScreenInverse;
   }
 
   if (window.ResizeObserver) {
-    new ResizeObserver(invalidateMapClientRect).observe(svg);
+    new ResizeObserver(invalidateMapGeometry).observe(svg);
   }
-  window.addEventListener("resize", invalidateMapClientRect, { passive: true });
-  window.addEventListener("scroll", invalidateMapClientRect, { passive: true, capture: true });
+  window.addEventListener("resize", invalidateMapGeometry, { passive: true });
+  window.addEventListener("scroll", invalidateMapGeometry, { passive: true, capture: true });
+  window.visualViewport?.addEventListener("resize", invalidateMapGeometry, { passive: true });
+  window.visualViewport?.addEventListener("scroll", invalidateMapGeometry, { passive: true });
 
-  function clientPointInMap(clientX, clientY) {
-    const rect = currentMapClientRect();
+  function clientPointInMap(clientX, clientY, inverse = currentMapInverse()) {
+    if (inverse) {
+      return [
+        inverse.a * clientX + inverse.c * clientY + inverse.e,
+        inverse.b * clientX + inverse.d * clientY + inverse.f
+      ];
+    }
+    const rect = svg.getBoundingClientRect();
+    const scale = Math.min(
+      rect.width / Math.max(cameraFrame.width, 1),
+      rect.height / Math.max(cameraFrame.height, 1)
+    );
+    const renderedWidth = cameraFrame.width * scale;
+    const renderedHeight = cameraFrame.height * scale;
     return [
-      (clientX - rect.left) * 1000 / Math.max(rect.width, 1),
-      (clientY - rect.top) * 790 / Math.max(rect.height, 1)
+      cameraFrame.x + (clientX - rect.left - (rect.width - renderedWidth) / 2) / Math.max(scale, 1e-6),
+      cameraFrame.y + (clientY - rect.top - (rect.height - renderedHeight) / 2) / Math.max(scale, 1e-6)
     ];
+  }
+
+  function cameraCenter(frame = cameraFrame) {
+    return [frame.x + frame.width / 2, frame.y + frame.height / 2];
+  }
+
+  function clampZoomPosition() {
+    const factor = 1 - zoomState.scale;
+    zoomState.x = clamp(
+      zoomState.x,
+      (cameraFrame.x + cameraFrame.width) * factor,
+      cameraFrame.x * factor
+    );
+    zoomState.y = clamp(
+      zoomState.y,
+      (cameraFrame.y + cameraFrame.height) * factor,
+      cameraFrame.y * factor
+    );
+  }
+
+  function responsiveCameraFrame(value) {
+    if (!portraitCameraQuery.matches) return { ...fullCameraFrame };
+    const t = smootherstep(value);
+    return {
+      x: portraitSchemeFrame.x + (portraitGeographyFrame.x - portraitSchemeFrame.x) * t,
+      y: portraitSchemeFrame.y + (portraitGeographyFrame.y - portraitSchemeFrame.y) * t,
+      width: portraitSchemeFrame.width + (portraitGeographyFrame.width - portraitSchemeFrame.width) * t,
+      height: portraitSchemeFrame.height + (portraitGeographyFrame.height - portraitSchemeFrame.height) * t
+    };
+  }
+
+  function updateCameraFrame(value) {
+    currentMorphValue = value;
+    const nextFrame = responsiveCameraFrame(value);
+    if (
+      Math.abs(nextFrame.x - cameraFrame.x) < 0.005
+      && Math.abs(nextFrame.y - cameraFrame.y) < 0.005
+      && Math.abs(nextFrame.width - cameraFrame.width) < 0.005
+      && Math.abs(nextFrame.height - cameraFrame.height) < 0.005
+    ) return;
+
+    const previousCenter = cameraCenter();
+    const contentCenter = [
+      (previousCenter[0] - zoomState.x) / zoomState.scale,
+      (previousCenter[1] - zoomState.y) / zoomState.scale
+    ];
+    cameraFrame = nextFrame;
+    svg.setAttribute(
+      "viewBox",
+      `${cameraFrame.x.toFixed(2)} ${cameraFrame.y.toFixed(2)} ${cameraFrame.width.toFixed(2)} ${cameraFrame.height.toFixed(2)}`
+    );
+    if (portraitCameraQuery.matches) {
+      const targetX = cameraFrame.x + cameraFrame.width - 34;
+      const targetY = cameraFrame.y + 155;
+      northLayer.setAttribute(
+        "transform",
+        `translate(${targetX.toFixed(2)} ${targetY.toFixed(2)}) scale(0.78) translate(-946 -78)`
+      );
+    } else {
+      northLayer.removeAttribute("transform");
+    }
+    invalidateMapGeometry();
+    if (zoomState.scale <= 1.001) {
+      zoomState.x = 0;
+      zoomState.y = 0;
+    } else {
+      const nextCenter = cameraCenter();
+      zoomState.x = nextCenter[0] - contentCenter[0] * zoomState.scale;
+      zoomState.y = nextCenter[1] - contentCenter[1] * zoomState.scale;
+      clampZoomPosition();
+    }
+    scheduleZoomRender();
+  }
+
+  function refreshResponsiveCamera() {
+    updateCameraFrame(currentMorphValue);
+  }
+
+  if (portraitCameraQuery.addEventListener) {
+    portraitCameraQuery.addEventListener("change", refreshResponsiveCamera);
+  } else {
+    portraitCameraQuery.addListener(refreshResponsiveCamera);
   }
 
   function renderZoom() {
@@ -716,15 +842,14 @@
     if (!zoomRenderFrame) zoomRenderFrame = requestAnimationFrame(renderZoom);
   }
 
-  function applyZoom(nextScale, focus = [500, 395]) {
+  function applyZoom(nextScale, focus = cameraCenter()) {
     const scale = clamp(nextScale, 1, 6);
     const contentX = (focus[0] - zoomState.x) / zoomState.scale;
     const contentY = (focus[1] - zoomState.y) / zoomState.scale;
     zoomState.x = focus[0] - contentX * scale;
     zoomState.y = focus[1] - contentY * scale;
     zoomState.scale = scale;
-    zoomState.x = clamp(zoomState.x, 1000 * (1 - scale), 0);
-    zoomState.y = clamp(zoomState.y, 790 * (1 - scale), 0);
+    clampZoomPosition();
     scheduleZoomRender();
   }
 
@@ -736,16 +861,33 @@
     });
   });
 
+  const mapInteractionKinds = new Set();
+
+  function beginMapInteraction(kind) {
+    if (mapInteractionKinds.has(kind)) return;
+    mapInteractionKinds.add(kind);
+    stage.dataset.interacting = "true";
+    pauseBadgePositionAnimation();
+  }
+
+  function endMapInteraction(kind) {
+    mapInteractionKinds.delete(kind);
+    if (mapInteractionKinds.size) return;
+    delete stage.dataset.interacting;
+    scheduleBadgePositionAnimation();
+  }
+
+  function hideMapTooltip() {
+    tip.classList.remove("is-visible");
+    tip.setAttribute("aria-hidden", "true");
+  }
+
   svg.addEventListener("wheel", event => {
     event.preventDefault();
-    if (stage.dataset.zooming !== "true") {
-      stage.dataset.zooming = "true";
-      pauseBadgePositionAnimation();
-    }
+    beginMapInteraction("wheel");
     window.clearTimeout(wheelEndTimer);
     wheelEndTimer = window.setTimeout(() => {
-      delete stage.dataset.zooming;
-      scheduleBadgePositionAnimation();
+      endMapInteraction("wheel");
     }, 180);
     const factor = Math.exp(-event.deltaY * 0.0015);
     applyZoom(zoomState.scale * factor, clientPointInMap(event.clientX, event.clientY));
@@ -756,58 +898,159 @@
     applyZoom(zoomState.scale * 1.55, clientPointInMap(event.clientX, event.clientY));
   });
 
-  let panPointer = null;
-  svg.addEventListener("pointerdown", event => {
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-    if (event.target.closest(".metro-station-hit, .mobility-station-hit")) return;
-    const rect = currentMapClientRect();
-    panPointer = {
-      id: event.pointerId,
-      startClientX: event.clientX,
-      startClientY: event.clientY,
-      startX: zoomState.x,
-      startY: zoomState.y,
-      unitsPerPixelX: 1000 / Math.max(rect.width, 1),
-      unitsPerPixelY: 790 / Math.max(rect.height, 1)
-    };
-    svg.setPointerCapture(event.pointerId);
-    stage.dataset.panning = "true";
-    pauseBadgePositionAnimation();
-    event.preventDefault();
-  });
+  const activePointers = new Map();
+  let pointerGesture = null;
 
-  function updatePanPosition(event) {
-    if (!panPointer || panPointer.id !== event.pointerId) return;
-    const dx = (event.clientX - panPointer.startClientX) * panPointer.unitsPerPixelX;
-    const dy = (event.clientY - panPointer.startClientY) * panPointer.unitsPerPixelY;
-    zoomState.x = clamp(
-      panPointer.startX + dx,
-      1000 * (1 - zoomState.scale),
-      0
+  function pointerDistance(first, second) {
+    return Math.hypot(second.x - first.x, second.y - first.y);
+  }
+
+  function pointerMidpoint(first, second) {
+    return [(first.x + second.x) / 2, (first.y + second.y) / 2];
+  }
+
+  function rebasePointerGesture() {
+    const pointers = [...activePointers.values()];
+    if (!pointers.length) {
+      pointerGesture = null;
+      delete stage.dataset.panning;
+      delete stage.dataset.pinching;
+      return;
+    }
+    const inverse = currentMapInverse();
+    if (!inverse) return;
+
+    if (pointers.length === 1) {
+      const pointer = pointers[0];
+      pointerGesture = {
+        type: "pan",
+        ids: [pointer.id],
+        inverse,
+        startClientX: pointer.x,
+        startClientY: pointer.y,
+        startX: zoomState.x,
+        startY: zoomState.y,
+        moved: false
+      };
+      stage.dataset.panning = "true";
+      delete stage.dataset.pinching;
+      return;
+    }
+
+    const first = pointers[0];
+    const second = pointers[1];
+    const midpoint = pointerMidpoint(first, second);
+    const midpointMap = clientPointInMap(midpoint[0], midpoint[1], inverse);
+    pointerGesture = {
+      type: "pinch",
+      ids: [first.id, second.id],
+      inverse,
+      startDistance: Math.max(pointerDistance(first, second), 1),
+      startScale: zoomState.scale,
+      contentAnchor: [
+        (midpointMap[0] - zoomState.x) / zoomState.scale,
+        (midpointMap[1] - zoomState.y) / zoomState.scale
+      ]
+    };
+    delete stage.dataset.panning;
+    stage.dataset.pinching = "true";
+    hideMapTooltip();
+  }
+
+  function updatePointerGesture() {
+    if (!pointerGesture) return;
+    if (pointerGesture.type === "pan") {
+      const pointer = activePointers.get(pointerGesture.ids[0]);
+      if (!pointer) return;
+      const clientDx = pointer.x - pointerGesture.startClientX;
+      const clientDy = pointer.y - pointerGesture.startClientY;
+      if (!pointerGesture.moved && Math.hypot(clientDx, clientDy) > 3) {
+        pointerGesture.moved = true;
+        hideMapTooltip();
+      }
+      const inverse = pointerGesture.inverse;
+      const dx = inverse.a * clientDx + inverse.c * clientDy;
+      const dy = inverse.b * clientDx + inverse.d * clientDy;
+      zoomState.x = pointerGesture.startX + dx;
+      zoomState.y = pointerGesture.startY + dy;
+      clampZoomPosition();
+      scheduleZoomRender();
+      return;
+    }
+
+    const first = activePointers.get(pointerGesture.ids[0]);
+    const second = activePointers.get(pointerGesture.ids[1]);
+    if (!first || !second) return;
+    const midpoint = pointerMidpoint(first, second);
+    const midpointMap = clientPointInMap(midpoint[0], midpoint[1], pointerGesture.inverse);
+    zoomState.scale = clamp(
+      pointerGesture.startScale
+        * pointerDistance(first, second)
+        / pointerGesture.startDistance,
+      1,
+      6
     );
-    zoomState.y = clamp(
-      panPointer.startY + dy,
-      790 * (1 - zoomState.scale),
-      0
-    );
+    zoomState.x = midpointMap[0] - pointerGesture.contentAnchor[0] * zoomState.scale;
+    zoomState.y = midpointMap[1] - pointerGesture.contentAnchor[1] * zoomState.scale;
+    clampZoomPosition();
     scheduleZoomRender();
   }
 
-  svg.addEventListener("pointermove", event => {
-    updatePanPosition(event);
+  svg.addEventListener("pointerdown", event => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    if (
+      event.pointerType === "mouse"
+      && event.target.closest(".metro-station-hit, .mobility-station-hit")
+    ) return;
+    activePointers.set(event.pointerId, {
+      id: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      pointerType: event.pointerType
+    });
+    try {
+      svg.setPointerCapture(event.pointerId);
+    } catch {}
+    beginMapInteraction("pointer");
+    rebasePointerGesture();
+    event.preventDefault();
   });
 
-  function finishPan(event) {
-    if (!panPointer || panPointer.id !== event.pointerId) return;
-    updatePanPosition(event);
-    if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
-    panPointer = null;
-    delete stage.dataset.panning;
-    scheduleBadgePositionAnimation();
+  svg.addEventListener("pointermove", event => {
+    if (!activePointers.has(event.pointerId)) return;
+    const pointer = activePointers.get(event.pointerId);
+    pointer.x = event.clientX;
+    pointer.y = event.clientY;
+    updatePointerGesture();
+    event.preventDefault();
+  });
+
+  function finishPointer(event, releaseCapture = true) {
+    if (!activePointers.has(event.pointerId)) return;
+    const pointer = activePointers.get(event.pointerId);
+    pointer.x = event.clientX;
+    pointer.y = event.clientY;
+    updatePointerGesture();
+    activePointers.delete(event.pointerId);
+    if (releaseCapture && svg.hasPointerCapture(event.pointerId)) {
+      try {
+        svg.releasePointerCapture(event.pointerId);
+      } catch {}
+    }
+    if (activePointers.size) {
+      rebasePointerGesture();
+    } else {
+      pointerGesture = null;
+      delete stage.dataset.panning;
+      delete stage.dataset.pinching;
+      endMapInteraction("pointer");
+    }
+    event.preventDefault();
   }
 
-  svg.addEventListener("pointerup", finishPan);
-  svg.addEventListener("pointercancel", finishPan);
+  svg.addEventListener("pointerup", event => finishPointer(event));
+  svg.addEventListener("pointercancel", event => finishPointer(event));
+  svg.addEventListener("lostpointercapture", event => finishPointer(event, false));
   applyZoom(1);
 
   function pathString(points) {
@@ -2034,7 +2277,7 @@
   }
 
   function scheduleBadgePositionAnimation() {
-    if (stage.dataset.panning === "true" || stage.dataset.zooming === "true") return;
+    if (stage.dataset.interacting === "true") return;
     if (reduceBadgeMotion) {
       allBadgeRenderers.forEach(badge => {
         if (badge.targetPosition) setRenderedBadgePosition(badge, badge.targetPosition);
@@ -2347,6 +2590,7 @@
   function update(value) {
     const raw = clamp(value, 0, 1);
     const t = smootherstep(raw);
+    updateCameraFrame(raw);
     const baseOpacity = smootherstep((raw - 0.18) / 0.82);
     const roadOpacity = smootherstep((raw - 0.34) / 0.66);
     const labelOpacity = smootherstep((raw - 0.48) / 0.52);
