@@ -1141,9 +1141,24 @@
     };
   }
 
+  function positionNorthArrow(value, frame) {
+    const geographyOffset = 48 * smootherstep(value);
+    if (portraitCameraQuery.matches) {
+      const targetX = frame.x + frame.width - 34;
+      const targetY = frame.y + 155 + geographyOffset;
+      northLayer.setAttribute(
+        "transform",
+        `translate(${targetX.toFixed(2)} ${targetY.toFixed(2)}) scale(0.78) translate(-946 -78)`
+      );
+      return;
+    }
+    northLayer.setAttribute("transform", `translate(0 ${geographyOffset.toFixed(2)})`);
+  }
+
   function updateCameraFrame(value) {
     currentMorphValue = value;
     const nextFrame = responsiveCameraFrame(value);
+    positionNorthArrow(value, nextFrame);
     if (
       Math.abs(nextFrame.x - cameraFrame.x) < 0.005
       && Math.abs(nextFrame.y - cameraFrame.y) < 0.005
@@ -1161,16 +1176,6 @@
       "viewBox",
       `${cameraFrame.x.toFixed(2)} ${cameraFrame.y.toFixed(2)} ${cameraFrame.width.toFixed(2)} ${cameraFrame.height.toFixed(2)}`
     );
-    if (portraitCameraQuery.matches) {
-      const targetX = cameraFrame.x + cameraFrame.width - 34;
-      const targetY = cameraFrame.y + 155;
-      northLayer.setAttribute(
-        "transform",
-        `translate(${targetX.toFixed(2)} ${targetY.toFixed(2)}) scale(0.78) translate(-946 -78)`
-      );
-    } else {
-      northLayer.removeAttribute("transform");
-    }
     invalidateMapGeometry();
     if (zoomState.scale <= 1.001) {
       zoomState.x = 0;
