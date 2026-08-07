@@ -6,29 +6,42 @@
   <meta name="theme-color" content="#05070a">
   <meta name="color-scheme" content="dark">
   <meta name="author" content="Alejandro Romero González">
-  <meta name="description" content="Mapa interactivo de la Movilidad Integrada de la Ciudad de México: del plano oficial a la geografía real.">
+  <meta name="description" content="Mapa interactivo de la Movilidad Integrada de la Ciudad de México: del mapa esquemático a la geografía real.">
   <title>Movilidad Integrada CDMX</title>
   <style>
     * { box-sizing: border-box; }
 
     html {
+      height: 100%;
       background: #05070a;
       color: #f4f7fa;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
     body {
+      height: 100vh;
+      height: 100svh;
+      height: 100dvh;
       min-width: 320px;
       margin: 0;
+      overflow: hidden;
       background:
         radial-gradient(circle at 50% -20%, rgba(74, 89, 104, 0.16), transparent 38rem),
         #05070a;
     }
 
     .site-shell {
-      width: min(100%, 1440px);
+      --page-gutter: clamp(0.75rem, 2.2vw, 2rem);
+      --controls-reserve: 4.5rem;
+      width: 100%;
+      height: 100%;
       margin-inline: auto;
-      padding: clamp(0.75rem, 2.2vw, 2rem);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      padding-top: max(var(--page-gutter), env(safe-area-inset-top));
+      padding-right: max(var(--page-gutter), env(safe-area-inset-right));
+      padding-bottom: calc(var(--controls-reserve) + env(safe-area-inset-bottom));
+      padding-left: max(var(--page-gutter), env(safe-area-inset-left));
     }
 
     .site-header {
@@ -56,15 +69,48 @@
 
     .site-main {
       min-width: 0;
+      min-height: 0;
+      display: grid;
+      place-items: center;
+      container-type: size;
     }
 
-    .site-main .metro-map {
-      max-height: min(78svh, 900px);
+    .site-main #metro-cdmx-morph {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      display: grid;
+      place-items: center;
+    }
+
+    .site-main #metro-cdmx-morph .metro-stage {
+      width: min(100cqw, 126.5823cqh);
+      aspect-ratio: 1000 / 790;
+    }
+
+    .site-main #metro-cdmx-morph .metro-map {
+      width: 100%;
+      height: 100%;
+      max-height: none;
+    }
+
+    .site-main #metro-cdmx-morph .viz-controls {
+      position: fixed;
+      z-index: 10;
+      inset-inline: 0;
+      bottom: 0;
+      width: 100%;
+      margin-inline: auto;
+      padding-top: 0.45rem;
+      padding-right: max(var(--page-gutter), env(safe-area-inset-right));
+      padding-bottom: calc(0.65rem + env(safe-area-inset-bottom));
+      padding-left: max(var(--page-gutter), env(safe-area-inset-left));
+      background: linear-gradient(to top, #05070a 72%, rgba(5, 7, 10, 0.95));
     }
 
     @media (max-width: 680px) {
       .site-shell {
-        padding: 0.65rem;
+        --page-gutter: 0.65rem;
       }
 
       .site-header {
@@ -77,8 +123,25 @@
         text-align: left;
       }
 
-      .site-main .metro-map {
-        max-height: none;
+    }
+
+    @media (max-height: 500px) and (orientation: landscape) {
+      .site-shell {
+        --page-gutter: 0.45rem;
+        --controls-reserve: 4.25rem;
+      }
+
+      .site-header {
+        padding-bottom: 0.35rem;
+      }
+
+      .site-header h1 {
+        font-size: 1rem;
+      }
+
+      .site-header p {
+        margin-top: 0;
+        font-size: 0.72rem;
       }
     }
   </style>
@@ -87,7 +150,7 @@
   <div class="site-shell">
     <header class="site-header">
       <h1>Movilidad Integrada CDMX</h1>
-      <p>Explora el plano integrado y su correspondencia con la geografía real.</p>
+      <p>Explora el mapa esquemático y su correspondencia con la geografía real</p>
     </header>
     <main class="site-main">
       <style>
@@ -102,6 +165,7 @@
     position: relative;
     width: 100%;
     overflow: hidden;
+    contain: layout paint;
     background: #05070a;
   }
 
@@ -111,6 +175,9 @@
     height: auto;
     overflow: hidden;
     touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
     cursor: grab;
   }
 
@@ -162,33 +229,26 @@
   }
 
   #metro-cdmx-morph .metro-control {
-    width: min(100%, 520px);
-    flex: 1 1 300px;
+    width: 100%;
+    min-height: 1.7rem;
+    margin: 0;
     accent-color: #f4f7fa;
   }
 
-  #metro-cdmx-morph .metro-mode {
-    min-width: 11rem;
-    font-variant-numeric: tabular-nums;
-  }
-
-  #metro-cdmx-morph .metro-detail {
-    min-height: 1.5em;
-  }
-
   #metro-cdmx-morph .viz-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.7rem 1rem;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.18rem;
     padding: 0.7rem 0 0;
   }
 
-  #metro-cdmx-morph .viz-row {
+  #metro-cdmx-morph .metro-range-labels {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
+    justify-content: space-between;
+    width: 100%;
+    font-size: 0.9rem;
+    font-weight: 500;
   }
 
   #metro-cdmx-morph .form-label {
@@ -221,13 +281,12 @@
     place-items: center;
     padding: 0 0.55rem;
     color: #f4f7fa;
-    background: rgba(17, 21, 26, 0.9);
+    background: rgba(17, 21, 26, 0.96);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 0.45rem;
     font: inherit;
     font-weight: 500;
     cursor: pointer;
-    backdrop-filter: blur(8px);
   }
 
   #metro-cdmx-morph .metro-zoom-button:hover {
@@ -307,6 +366,17 @@
     letter-spacing: 0.08em;
   }
 
+  #metro-cdmx-morph .metro-stage[data-panning="true"] .metro-line,
+  #metro-cdmx-morph .metro-stage[data-panning="true"] .metro-b-line,
+  #metro-cdmx-morph .metro-stage[data-panning="true"] .official-schematic-line,
+  #metro-cdmx-morph .metro-stage[data-panning="true"] .mobility-line,
+  #metro-cdmx-morph .metro-stage[data-zooming="true"] .metro-line,
+  #metro-cdmx-morph .metro-stage[data-zooming="true"] .metro-b-line,
+  #metro-cdmx-morph .metro-stage[data-zooming="true"] .official-schematic-line,
+  #metro-cdmx-morph .metro-stage[data-zooming="true"] .mobility-line {
+    filter: none;
+  }
+
   #metro-cdmx-morph .metro-municipality-label {
     font-family: ui-sans-serif, system-ui, sans-serif;
     font-weight: 500;
@@ -321,10 +391,6 @@
       font-size: 0.78rem;
     }
 
-    #metro-cdmx-morph .metro-control {
-      flex-basis: 100%;
-    }
-
     #metro-cdmx-morph .metro-zoom-controls {
       top: 0.5rem;
       right: 0.5rem;
@@ -336,13 +402,6 @@
       padding-inline: 0.4rem;
     }
 
-    #metro-cdmx-morph .viz-controls {
-      align-items: stretch;
-    }
-
-    #metro-cdmx-morph .metro-mode {
-      min-width: 0;
-    }
   }
 </style>
 
@@ -356,7 +415,7 @@
       preserveAspectRatio="xMidYMid meet"
     >
       <title id="metro-cdmx-title">Movilidad Integrada de la Ciudad de México</title>
-      <desc id="metro-cdmx-desc">Mapa interactivo que interpola entre un plano integrado y la geografía real del Metro, las siete líneas de Metrobús, las tres líneas de Cablebús y el Tren Suburbano con su ramal al AIFA.</desc>
+      <desc id="metro-cdmx-desc">Mapa interactivo que interpola entre un mapa esquemático y la geografía real del Metro, las siete líneas de Metrobús, las tres líneas de Cablebús y el Tren Suburbano con su ramal al AIFA.</desc>
       <rect width="1000" height="790" fill="#05070a"></rect>
       <defs>
         <clipPath id="metro-cdmx-context-clip">
@@ -410,7 +469,11 @@
   </div>
 
   <div class="viz-controls">
-    <label class="form-label" for="metro-cdmx-range">Plano integrado ↔ geografía</label>
+    <label class="sr-only" for="metro-cdmx-range">Transición entre esquema y geografía</label>
+    <div class="metro-range-labels" aria-hidden="true">
+      <span>Esquema</span>
+      <span>Geografía</span>
+    </div>
     <input
       id="metro-cdmx-range"
       class="form-range metro-control"
@@ -419,11 +482,9 @@
       max="100"
       value="0"
       step="1"
-      aria-valuetext="Plano integrado"
+      aria-valuetext="Esquema"
     >
-    <span class="metro-mode text-small" aria-live="polite">Plano integrado · 0%</span>
   </div>
-  <div class="viz-row text-small text-muted metro-detail" aria-live="polite">23 líneas · 4 sistemas</div>
 </div>
 
 <script>
@@ -549,8 +610,6 @@
   const svg = root.querySelector(".metro-map");
   const stage = root.querySelector(".metro-stage");
   const slider = root.querySelector("#metro-cdmx-range");
-  const modeLabel = root.querySelector(".metro-mode");
-  const detail = root.querySelector(".metro-detail");
   const tip = root.querySelector(".metro-tip");
   const zoomGroup = root.querySelector('[data-layer="zoomable"]');
   const zoomStatus = root.querySelector(".metro-zoom-status");
@@ -598,13 +657,63 @@
   }
 
   const zoomState = { scale: 1, x: 0, y: 0 };
+  let zoomRenderFrame = 0;
+  let renderedZoomPercent = -1;
+  let mapClientRect = null;
+  let wheelEndTimer = 0;
+
+  function invalidateMapClientRect() {
+    mapClientRect = null;
+  }
+
+  function currentMapClientRect() {
+    if (!mapClientRect) {
+      const rect = svg.getBoundingClientRect();
+      mapClientRect = {
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height
+      };
+    }
+    return mapClientRect;
+  }
+
+  if (window.ResizeObserver) {
+    new ResizeObserver(invalidateMapClientRect).observe(svg);
+  }
+  window.addEventListener("resize", invalidateMapClientRect, { passive: true });
+  window.addEventListener("scroll", invalidateMapClientRect, { passive: true, capture: true });
 
   function clientPointInMap(clientX, clientY) {
-    const rect = svg.getBoundingClientRect();
+    const rect = currentMapClientRect();
     return [
       (clientX - rect.left) * 1000 / Math.max(rect.width, 1),
       (clientY - rect.top) * 790 / Math.max(rect.height, 1)
     ];
+  }
+
+  function renderZoom() {
+    zoomRenderFrame = 0;
+    zoomGroup.setAttribute(
+      "transform",
+      `translate(${zoomState.x.toFixed(2)} ${zoomState.y.toFixed(2)}) scale(${zoomState.scale.toFixed(4)})`
+    );
+    const percent = Math.round(zoomState.scale * 100);
+    if (percent !== renderedZoomPercent) {
+      renderedZoomPercent = percent;
+      zoomStatus.textContent = `Zoom ${percent}%`;
+    }
+    zoomButtons.forEach(button => {
+      const shouldDisable = button.dataset.zoom === "out"
+        ? zoomState.scale <= 1.001
+        : button.dataset.zoom === "in" && zoomState.scale >= 5.999;
+      if (button.disabled !== shouldDisable) button.disabled = shouldDisable;
+    });
+  }
+
+  function scheduleZoomRender() {
+    if (!zoomRenderFrame) zoomRenderFrame = requestAnimationFrame(renderZoom);
   }
 
   function applyZoom(nextScale, focus = [500, 395]) {
@@ -616,16 +725,7 @@
     zoomState.scale = scale;
     zoomState.x = clamp(zoomState.x, 1000 * (1 - scale), 0);
     zoomState.y = clamp(zoomState.y, 790 * (1 - scale), 0);
-    zoomGroup.setAttribute(
-      "transform",
-      `translate(${zoomState.x.toFixed(2)} ${zoomState.y.toFixed(2)}) scale(${scale.toFixed(4)})`
-    );
-    const percent = Math.round(scale * 100);
-    zoomStatus.textContent = `Zoom ${percent}%`;
-    zoomButtons.forEach(button => {
-      if (button.dataset.zoom === "out") button.disabled = scale <= 1.001;
-      if (button.dataset.zoom === "in") button.disabled = scale >= 5.999;
-    });
+    scheduleZoomRender();
   }
 
   zoomButtons.forEach(button => {
@@ -638,6 +738,15 @@
 
   svg.addEventListener("wheel", event => {
     event.preventDefault();
+    if (stage.dataset.zooming !== "true") {
+      stage.dataset.zooming = "true";
+      pauseBadgePositionAnimation();
+    }
+    window.clearTimeout(wheelEndTimer);
+    wheelEndTimer = window.setTimeout(() => {
+      delete stage.dataset.zooming;
+      scheduleBadgePositionAnimation();
+    }, 180);
     const factor = Math.exp(-event.deltaY * 0.0015);
     applyZoom(zoomState.scale * factor, clientPointInMap(event.clientX, event.clientY));
   }, { passive: false });
@@ -651,32 +760,50 @@
   svg.addEventListener("pointerdown", event => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
     if (event.target.closest(".metro-station-hit, .mobility-station-hit")) return;
-    panPointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
+    const rect = currentMapClientRect();
+    panPointer = {
+      id: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startX: zoomState.x,
+      startY: zoomState.y,
+      unitsPerPixelX: 1000 / Math.max(rect.width, 1),
+      unitsPerPixelY: 790 / Math.max(rect.height, 1)
+    };
     svg.setPointerCapture(event.pointerId);
     stage.dataset.panning = "true";
+    pauseBadgePositionAnimation();
     event.preventDefault();
   });
 
-  svg.addEventListener("pointermove", event => {
+  function updatePanPosition(event) {
     if (!panPointer || panPointer.id !== event.pointerId) return;
-    const rect = svg.getBoundingClientRect();
-    const dx = (event.clientX - panPointer.x) * 1000 / Math.max(rect.width, 1);
-    const dy = (event.clientY - panPointer.y) * 790 / Math.max(rect.height, 1);
-    zoomState.x = clamp(zoomState.x + dx, 1000 * (1 - zoomState.scale), 0);
-    zoomState.y = clamp(zoomState.y + dy, 790 * (1 - zoomState.scale), 0);
-    panPointer.x = event.clientX;
-    panPointer.y = event.clientY;
-    zoomGroup.setAttribute(
-      "transform",
-      `translate(${zoomState.x.toFixed(2)} ${zoomState.y.toFixed(2)}) scale(${zoomState.scale.toFixed(4)})`
+    const dx = (event.clientX - panPointer.startClientX) * panPointer.unitsPerPixelX;
+    const dy = (event.clientY - panPointer.startClientY) * panPointer.unitsPerPixelY;
+    zoomState.x = clamp(
+      panPointer.startX + dx,
+      1000 * (1 - zoomState.scale),
+      0
     );
+    zoomState.y = clamp(
+      panPointer.startY + dy,
+      790 * (1 - zoomState.scale),
+      0
+    );
+    scheduleZoomRender();
+  }
+
+  svg.addEventListener("pointermove", event => {
+    updatePanPosition(event);
   });
 
   function finishPan(event) {
     if (!panPointer || panPointer.id !== event.pointerId) return;
+    updatePanPosition(event);
     if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
     panPointer = null;
     delete stage.dataset.panning;
+    scheduleBadgePositionAnimation();
   }
 
   svg.addEventListener("pointerup", finishPan);
@@ -1593,7 +1720,6 @@
   }
 
   function showTooltip(copy, station, fallbackIconKey) {
-    detail.textContent = copy;
     const row = document.createElement("span");
     row.className = "metro-tip-row";
     const label = document.createElement("span");
@@ -1659,7 +1785,6 @@
     hit.addEventListener("pointerleave", () => {
       tip.classList.remove("is-visible");
       tip.setAttribute("aria-hidden", "true");
-      detail.textContent = `${data.meta.total_lines || 23} líneas · ${data.meta.systems || 4} sistemas`;
     });
   });
 
@@ -1706,7 +1831,6 @@
     hit.addEventListener("pointerleave", () => {
       tip.classList.remove("is-visible");
       tip.setAttribute("aria-hidden", "true");
-      detail.textContent = `${data.meta.total_lines || 23} líneas · ${data.meta.systems || 4} sistemas`;
     });
   });
 
@@ -1893,6 +2017,12 @@
   const reduceBadgeMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   let badgeAnimationFrame = 0;
 
+  function pauseBadgePositionAnimation() {
+    if (!badgeAnimationFrame) return;
+    cancelAnimationFrame(badgeAnimationFrame);
+    badgeAnimationFrame = 0;
+  }
+
   function setRenderedBadgePosition(badge, position) {
     badge.displayPosition = [...position];
     badge.group.setAttribute(
@@ -1904,6 +2034,7 @@
   }
 
   function scheduleBadgePositionAnimation() {
+    if (stage.dataset.panning === "true" || stage.dataset.zooming === "true") return;
     if (reduceBadgeMotion) {
       allBadgeRenderers.forEach(badge => {
         if (badge.targetPosition) setRenderedBadgePosition(badge, badge.targetPosition);
@@ -2284,12 +2415,24 @@
     positionBadgeClusters(currentRoutePolylines);
 
     const percent = Math.round(raw * 100);
-    const state = percent === 0 ? "Plano integrado" : percent === 100 ? "Geografía" : "Transición";
-    modeLabel.textContent = `${state} · ${percent}%`;
-    slider.setAttribute("aria-valuetext", `${state}, ${percent} por ciento`);
+    const state = percent === 0
+      ? "Esquema"
+      : percent === 100
+        ? "Geografía"
+        : `Transición, ${percent} por ciento`;
+    slider.setAttribute("aria-valuetext", state);
   }
 
-  slider.addEventListener("input", event => update(Number(event.target.value) / 100));
+  let sliderUpdateFrame = 0;
+  let pendingSliderValue = 0;
+  slider.addEventListener("input", event => {
+    pendingSliderValue = Number(event.target.value) / 100;
+    if (sliderUpdateFrame) return;
+    sliderUpdateFrame = requestAnimationFrame(() => {
+      sliderUpdateFrame = 0;
+      update(pendingSliderValue);
+    });
+  });
   update(0);
 </script>
 
