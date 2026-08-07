@@ -418,9 +418,24 @@
     white-space: normal;
   }
 
-  #metro-cdmx-morph .metro-tip-row > span:last-child {
+  #metro-cdmx-morph .metro-tip-copy,
+  #metro-cdmx-morph .metro-tip-label {
     min-inline-size: 0;
     overflow-wrap: anywhere;
+  }
+
+  #metro-cdmx-morph .metro-tip-copy {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.12rem;
+  }
+
+  #metro-cdmx-morph .metro-tip-cycle {
+    color: var(--map-muted);
+    font-size: 0.72rem;
+    line-height: 1.2;
+    white-space: nowrap;
   }
 
   #metro-cdmx-morph .metro-tip-icon {
@@ -1032,10 +1047,12 @@
   const portraitCameraQuery = window.matchMedia("(max-width: 680px) and (orientation: portrait)");
   const northLayer = root.querySelector('[data-layer="north"]');
   const zoomState = { scale: 1, x: 0, y: 0 };
+  const renderedZoomState = { scale: 1, x: 0, y: 0 };
   let cameraFrame = { ...fullCameraFrame };
   let currentMorphValue = 0;
   let zoomRenderFrame = 0;
   let renderedZoomPercent = -1;
+  let mapScreenMatrix = null;
   let mapScreenInverse = null;
   let wheelEndTimer = 0;
   const zoomMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -1043,17 +1060,25 @@
   let zoomAnimationTarget = null;
   const stationHitSelector = ".metro-station-hit, .mobility-station-hit";
   const stationTipTargets = new WeakMap();
+  const stationTipTargetList = [];
+  let stationSelectionCycle = null;
   let pinnedTipTarget = null;
   let visibleTipTarget = null;
   const mapInteractionKinds = new Set();
 
   function invalidateMapGeometry() {
+    mapScreenMatrix = null;
     mapScreenInverse = null;
+  }
+
+  function currentMapMatrix() {
+    if (!mapScreenMatrix) mapScreenMatrix = svg.getScreenCTM();
+    return mapScreenMatrix;
   }
 
   function currentMapInverse() {
     if (!mapScreenInverse) {
-      const matrix = svg.getScreenCTM();
+      const matrix = currentMapMatrix();
       if (matrix) mapScreenInverse = matrix.inverse();
     }
     return mapScreenInverse;
@@ -1172,6 +1197,7 @@
 
   function renderZoom() {
     zoomRenderFrame = 0;
+    Object.assign(renderedZoomState, zoomState);
     zoomGroup.setAttribute(
       "transform",
       `translate(${zoomState.x.toFixed(2)} ${zoomState.y.toFixed(2)}) scale(${zoomState.scale.toFixed(4)})`
@@ -1295,7 +1321,10 @@
   }
 
   function hideMapTooltip(clearPinned = true) {
-    if (clearPinned) pinnedTipTarget = null;
+    if (clearPinned) {
+      pinnedTipTarget = null;
+      stationSelectionCycle = null;
+    }
     visibleTipTarget = null;
     tip.classList.remove("is-visible");
     tip.setAttribute("aria-hidden", "true");
@@ -1312,24 +1341,154 @@
     tip.style.top = `${clamp(anchorY, height + 14, stageRect.height - 8)}px`;
   }
 
-  function revealStationTooltip(target, pin = false) {
+  function revealStationTooltip(target, pin = false, selection = null) {
     target.render();
+    if (selection?.targets.length > 1) {
+      const copy = tip.querySelector(".metro-tip-copy");
+      if (copy) {
+        const cycle = document.createElement("span");
+        cycle.className = "metro-tip-cycle";
+        const position = `${selection.index + 1}/${selection.targets.length}`;
+        cycle.textContent = selection.pointerType === "mouse"
+          ? `Haz clic de nuevo · ${position}`
+          : `Toca de nuevo · ${position}`;
+        cycle.setAttribute(
+          "aria-label",
+          selection.pointerType === "mouse"
+            ? `Coincidencia ${selection.index + 1} de ${selection.targets.length}; haz clic de nuevo para ver la siguiente estación`
+            : `Coincidencia ${selection.index + 1} de ${selection.targets.length}; toca de nuevo para ver la siguiente estación`
+        );
+        copy.appendChild(cycle);
+      }
+    }
     visibleTipTarget = target;
     if (pin) pinnedTipTarget = target;
     positionTooltipForTarget(target);
   }
 
-  function registerStationTooltip(hit, render) {
-    const target = { hit, render };
+  function targetScreenGeometry(target, matrix) {
+    const [stationX, stationY] = target.station.current;
+    const mapX = renderedZoomState.x + stationX * renderedZoomState.scale;
+    const mapY = renderedZoomState.y + stationY * renderedZoomState.scale;
+    const screenScale = Math.max(
+      Math.hypot(matrix.a, matrix.b),
+      Math.hypot(matrix.c, matrix.d)
+    );
+    return {
+      target,
+      x: matrix.a * mapX + matrix.c * mapY + matrix.e,
+      y: matrix.b * mapX + matrix.d * mapY + matrix.f,
+      radius: target.hitRadius * renderedZoomState.scale * screenScale,
+      visualRadius: target.visualRadius * renderedZoomState.scale * screenScale
+    };
+  }
+
+  function stationClusterAt(clientX, clientY, pointerType, fallbackTarget = null) {
+    const matrix = currentMapMatrix();
+    if (!matrix || !stationTipTargetList.length) return null;
+    const geometries = stationTipTargetList.map(target => targetScreenGeometry(target, matrix));
+    const primaryRadius = pointerType === "mouse" ? 10 : 18;
+    const ranked = geometries
+      .map(item => ({ ...item, distance: Math.hypot(item.x - clientX, item.y - clientY) }))
+      .filter(item => item.distance <= Math.max(primaryRadius, item.radius + 3))
+      .sort((first, second) => first.distance - second.distance || second.target.order - first.target.order);
+    let primary = ranked[0] || null;
+    const fallback = fallbackTarget
+      ? geometries.find(item => item.target === fallbackTarget) || null
+      : null;
+    if (fallback) {
+      fallback.distance = Math.hypot(fallback.x - clientX, fallback.y - clientY);
+      if (!primary || fallback.distance <= primary.distance + 2) primary = fallback;
+    }
+    if (!primary) return null;
+
+    const overlapRadius = pointerType === "mouse" ? 2.5 : 3.5;
+    const overlapTolerance = pointerType === "mouse" ? 1 : 1.5;
+    const targets = geometries
+      .map(item => ({
+        ...item,
+        distance: Math.hypot(item.x - primary.x, item.y - primary.y)
+      }))
+      .filter(item => item.distance <= Math.max(
+        overlapRadius,
+        primary.visualRadius + item.visualRadius + overlapTolerance
+      ))
+      .sort((first, second) => {
+        if (first.target === primary.target) return -1;
+        if (second.target === primary.target) return 1;
+        return first.distance - second.distance || second.target.order - first.target.order;
+      })
+      .map(item => item.target);
+
+    return { targets, primary: primary.target };
+  }
+
+  function stationSelectionAt(
+    clientX,
+    clientY,
+    pointerType,
+    fallbackTarget = null,
+    frozenCluster = null
+  ) {
+    const cluster = frozenCluster
+      || stationClusterAt(clientX, clientY, pointerType, fallbackTarget);
+    if (!cluster) return null;
+    const key = cluster.targets.map(target => target.key).sort().join("|");
+    const repeatRadius = pointerType === "mouse" ? 12 : 24;
+    const repeatsCycle = stationSelectionCycle
+      && stationSelectionCycle.key === key
+      && Math.hypot(
+        clientX - stationSelectionCycle.clientX,
+        clientY - stationSelectionCycle.clientY
+      ) <= repeatRadius;
+    const targets = repeatsCycle ? stationSelectionCycle.targets : cluster.targets;
+    const index = repeatsCycle
+      ? (stationSelectionCycle.index + 1) % targets.length
+      : 0;
+    stationSelectionCycle = {
+      key,
+      targets,
+      index,
+      clientX: repeatsCycle ? stationSelectionCycle.clientX : clientX,
+      clientY: repeatsCycle ? stationSelectionCycle.clientY : clientY
+    };
+    return { targets, index, pointerType, target: targets[index] };
+  }
+
+  function selectStationAt(
+    clientX,
+    clientY,
+    pointerType,
+    fallbackTarget = null,
+    frozenCluster = null
+  ) {
+    const selection = stationSelectionAt(
+      clientX,
+      clientY,
+      pointerType,
+      fallbackTarget,
+      frozenCluster
+    );
+    if (!selection) return null;
+    revealStationTooltip(selection.target, true, selection);
+    return selection.target;
+  }
+
+  function registerStationTooltip(hit, render, station, key, visualRadius) {
+    const target = {
+      hit,
+      render,
+      station,
+      key,
+      hitRadius: Number(hit.getAttribute("r")) || 8,
+      visualRadius,
+      order: stationTipTargetList.length
+    };
     stationTipTargets.set(hit, target);
+    stationTipTargetList.push(target);
 
     hit.addEventListener("pointerenter", event => {
       if (event.pointerType !== "mouse" || pinnedTipTarget) return;
-      revealStationTooltip(target);
-    });
-    hit.addEventListener("pointerdown", event => {
-      if (event.pointerType !== "mouse" || event.button !== 0) return;
-      pinnedTipTarget = null;
       revealStationTooltip(target);
     });
     hit.addEventListener("pointerleave", event => {
@@ -1342,8 +1501,8 @@
   const tooltipOutsideBoundary = isStandaloneSite ? document : root;
   tooltipOutsideBoundary.addEventListener("pointerdown", event => {
     if (!pinnedTipTarget) return;
-    const hit = event.target.closest?.(stationHitSelector);
-    if (!hit) hideMapTooltip();
+    if (svg.contains(event.target)) return;
+    hideMapTooltip();
   }, true);
 
   svg.addEventListener("wheel", event => {
@@ -1483,9 +1642,20 @@
   svg.addEventListener("pointerdown", event => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
     const hit = event.target.closest?.(stationHitSelector);
-    const tipTarget = hit ? stationTipTargets.get(hit) || null : null;
+    const fallbackTarget = hit ? stationTipTargets.get(hit) || null : null;
+    const tipCluster = stationClusterAt(
+      event.clientX,
+      event.clientY,
+      event.pointerType,
+      fallbackTarget
+    );
+    const tipTarget = tipCluster?.primary || null;
     cancelZoomAnimation();
-    if (event.pointerType === "mouse" && tipTarget) return;
+    if (event.pointerType === "mouse" && tipTarget) {
+      selectStationAt(event.clientX, event.clientY, event.pointerType, tipTarget, tipCluster);
+      event.preventDefault();
+      return;
+    }
     if (!tipTarget) hideMapTooltip();
     activePointers.set(event.pointerId, {
       id: event.pointerId,
@@ -1493,7 +1663,8 @@
       y: event.clientY,
       pointerType: event.pointerType,
       tapEligible: true,
-      tipTarget
+      tipTarget,
+      tipCluster
     });
     try {
       svg.setPointerCapture(event.pointerId);
@@ -1537,7 +1708,15 @@
         && !completedGesture.moved
         && (pointer.pointerType === "touch" || pointer.pointerType === "pen");
       if (isTouchTap) {
-        if (pointer.tipTarget) revealStationTooltip(pointer.tipTarget, true);
+        if (pointer.tipTarget) {
+          selectStationAt(
+            pointer.x,
+            pointer.y,
+            pointer.pointerType,
+            pointer.tipTarget,
+            pointer.tipCluster
+          );
+        }
         else hideMapTooltip();
       }
     }
@@ -2464,11 +2643,16 @@
   function showTooltip(copy, station, fallbackIconKey) {
     const row = document.createElement("span");
     row.className = "metro-tip-row";
+    const text = document.createElement("span");
+    text.className = "metro-tip-copy";
     const label = document.createElement("span");
+    label.className = "metro-tip-label";
     label.textContent = copy;
     row.appendChild(stationTooltipIcon(station, fallbackIconKey));
-    row.appendChild(label);
+    text.appendChild(label);
+    row.appendChild(text);
     tip.replaceChildren(row);
+    tip.setAttribute("aria-atomic", "true");
     tip.setAttribute("aria-hidden", "false");
     tip.classList.add("is-visible");
   }
@@ -2511,7 +2695,11 @@
       const presentation = mobilityPresentation(station);
       const copy = `${station.name} · ${presentation.name} ${station.lines.join(" · ")}`;
       showTooltip(copy, station, presentation.icon);
-    });
+    }, station, `${station.system}:${station.id}`, station.system === "cablebus"
+      ? 4
+      : station.system === "suburbano"
+        ? 3.25
+        : 1.9);
   });
 
   const stationsLayer = root.querySelector('[data-layer="stations"]');
@@ -2539,7 +2727,7 @@
       const lineText = station.lines.join(" · ");
       const copy = `${station.name} · ${station.lines.length > 1 ? "líneas" : "línea"} ${lineText}`;
       showTooltip(copy, station, "metro");
-    });
+    }, station, `metro:${station.id}`, station.interchange ? 5.1 : 2.35);
   });
 
   function readableTextColor(hex) {
