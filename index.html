@@ -2777,14 +2777,18 @@
     return (0.299 * r + 0.587 * g + 0.114 * b) > 154 ? "#05070a" : "#ffffff";
   }
 
+  const terminalBadgeScale = 0.9;
+
   function createOfficialBadge(iconKey, routeLabel, routeColor, options = {}) {
     const group = svgNode("g");
-    const iconSize = 16;
-    const gap = routeLabel ? 2 : 0;
-    const routeWidth = routeLabel ? (String(routeLabel).length > 1 ? 18 : 15) : 0;
-    const routeHeight = 14.5;
+    const iconSize = 16 * terminalBadgeScale;
+    const gap = routeLabel ? 2 * terminalBadgeScale : 0;
+    const routeWidth = routeLabel
+      ? (String(routeLabel).length > 1 ? 18 : 15) * terminalBadgeScale
+      : 0;
+    const routeHeight = 14.5 * terminalBadgeScale;
     const totalWidth = iconSize + gap + routeWidth;
-    const clearance = 2.25;
+    const clearance = 2.25 * terminalBadgeScale;
     const plateHeight = iconSize + clearance * 2;
     const plate = svgNode("rect", {
       class: "badge-clearance",
@@ -2792,7 +2796,7 @@
       y: (-plateHeight / 2).toFixed(2),
       width: (totalWidth + clearance * 2).toFixed(2),
       height: plateHeight.toFixed(2),
-      rx: 3.8,
+      rx: (3.8 * terminalBadgeScale).toFixed(2),
       fill: "#05070a"
     });
     group.appendChild(plate);
@@ -2816,7 +2820,7 @@
         y: (-routeHeight / 2).toFixed(2),
         width: routeWidth,
         height: routeHeight,
-        rx: 2.1,
+        rx: (2.1 * terminalBadgeScale).toFixed(2),
         fill: options.fill || routeColor,
         stroke: options.stroke || "#05070a",
         "stroke-width": options.strokeWidth || 1.2
