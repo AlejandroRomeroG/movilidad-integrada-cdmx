@@ -16,9 +16,6 @@
   </p>
 </div>
 
-> [!NOTE]
-> Este es un proyecto independiente de visualización. No sustituye los mapas, horarios, avisos de servicio ni herramientas oficiales de planeación de viaje.
-
 El proyecto representa Metro, Metrobús, Cablebús y Tren Suburbano en un mismo espacio visual. En lugar de presentar dos mapas separados, interpola continuamente cada estación y cada trazo entre el esquema de Movilidad Integrada y su posición geográfica. Así permite observar qué conserva el diseño diagramático, qué simplifica y cómo se relaciona la red con el territorio metropolitano.
 
 **Sitio público:** [alejandroromerog.github.io/movilidad-integrada-cdmx](https://alejandroromerog.github.io/movilidad-integrada-cdmx/)
@@ -65,10 +62,23 @@ El GTFS incorporado corresponde al **24 de febrero de 2026**. La visualización 
 
 | Componente | Fuente o tratamiento |
 | --- | --- |
-| **Geometría esquemática** | [Mapa de Movilidad Integrada STC 2025](https://www.semovi.cdmx.gob.mx/storage/app/media/MI%20MAPA/Mapa%20MI_STC%202025.pdf), publicado por la Secretaría de Movilidad de la Ciudad de México. |
+| **Geometría esquemática** | [Conversión SVG usada como referencia](referencias/mapa-MI_STC-2025.svg), derivada del [Mapa de Movilidad Integrada STC 2025](https://www.semovi.cdmx.gob.mx/storage/app/media/MI%20MAPA/Mapa%20MI_STC%202025.pdf) publicado por la Secretaría de Movilidad de la Ciudad de México. |
 | **Rutas y estaciones** | [GTFS estático de la Ciudad de México](https://datos.cdmx.gob.mx/dataset/gtfs), con corte al 24 de febrero de 2026. |
 | **Ramal al AIFA** | Información pública de conectividad del [Tren Felipe Ángeles](https://www.aifa.aero/conectividad/tren). |
 | **Límites administrativos** | [Marco Geoestadístico](https://www.inegi.org.mx/temas/mg/) del INEGI para el contexto territorial. |
+
+### Referencia del esquema
+
+El archivo [`referencias/mapa-MI_STC-2025.svg`](referencias/mapa-MI_STC-2025.svg) conserva la versión vectorial empleada para estudiar el mapa oficial y hacer trazable el origen del diseño. No se utilizó únicamente como referencia visual: su geometría sirvió como guía para construir las posiciones del modo **Esquema**.
+
+El proceso siguió cuatro pasos:
+
+1. Se identificaron los trazos por sistema, línea, color y anchura para separar sus ejes vectoriales.
+2. Se normalizaron las transformaciones del SVG en un sistema de coordenadas común, conservando quiebres, direcciones, terminales y la relación espacial entre líneas.
+3. Se asociaron las estaciones con la guía de su línea y se mantuvo su orden topológico desde la terminal inicial hasta la final.
+4. Se reparametrizó cada recorrido por longitud acumulada para distribuir sus estaciones de forma equidistante, fijar las terminales en los extremos y sincronizar los nodos de correspondencia.
+
+Por ello, el esquema actual está inspirado directamente en el layout publicado por el gobierno de la CDMX, pero es una reconstrucción adaptada a la interpolación: regulariza distancias y reacomoda distintivos para conservar legibilidad durante la transición hacia la geografía.
 
 Cada estación conserva dos coordenadas: una extraída o reconstruida a partir del esquema oficial y otra derivada de su ubicación geográfica. El deslizador interpola ambas posiciones y actualiza las rutas en SVG. En el esquema, las estaciones se distribuyen de forma regular a lo largo de cada línea; en la geografía, los trazos siguen las formas del GTFS.
 
@@ -92,6 +102,7 @@ Después abre [http://localhost:8000](http://localhost:8000) en el navegador.
 | --- | --- |
 | `index.html` | Aplicación autocontenida: estructura, estilos, lógica, datos, geometrías e iconos. |
 | `.github/assets/mapa-esquematico.png` | Vista previa utilizada por este README. |
+| `referencias/mapa-MI_STC-2025.svg` | Conversión vectorial del mapa oficial utilizada para reconstruir la geometría esquemática. |
 | `.nojekyll` | Indica a GitHub Pages que publique los archivos sin procesamiento de Jekyll. |
 | `README.md` | Documentación, fuentes y guía de uso local. |
 
