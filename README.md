@@ -8,7 +8,6 @@
     <img alt="4 sistemas" src="https://img.shields.io/badge/sistemas-4-C72C8E?style=flat-square">
   </p>
   <p>
-    <a href="#qué-permite-explorar">Qué permite explorar</a> ·
     <a href="#cobertura">Cobertura</a> ·
     <a href="#fuentes-y-metodología">Fuentes y metodología</a> ·
     <a href="#inicio-rápido">Inicio rápido</a> ·
@@ -16,24 +15,13 @@
   </p>
 </div>
 
-El proyecto representa Metro, Metrobús, Cablebús y Tren Suburbano en un mismo espacio visual. En lugar de presentar dos mapas separados, interpola continuamente cada estación y cada trazo entre el esquema de Movilidad Integrada y su posición geográfica. Así permite observar qué conserva el diseño diagramático, qué simplifica y cómo se relaciona la red con el territorio metropolitano.
+El proyecto representa las líneas del Metro, Metrobús, Cablebús y Tren Suburbano en un mismo espacio visual. En lugar de presentar dos mapas separados, interpola continuamente cada estación y cada trazo entre el esquema de Movilidad Integrada y su posición geográfica. Así permite observar qué conserva el diseño diagramático, qué simplifica y cómo se relaciona la red con el territorio metropolitano.
 
 **Sitio público:** [alejandroromerog.github.io/movilidad-integrada-cdmx](https://alejandroromerog.github.io/movilidad-integrada-cdmx/)
 
 <a href="https://alejandroromerog.github.io/movilidad-integrada-cdmx/">
   <img src=".github/assets/mapa-esquematico.png" alt="Vista del mapa esquemático de la Movilidad Integrada de la CDMX" width="100%">
 </a>
-
-## Qué permite explorar
-
-| Capacidad | Qué aporta |
-| --- | --- |
-| **Esquema ↔ geografía** | Un control continuo muestra cómo cambia la posición de estaciones y líneas entre el plano integrado y el territorio real. |
-| **Red multimodal** | Reúne 23 líneas de cuatro sistemas y conserva colores, identificadores y transbordos. |
-| **Estaciones** | Cada nodo abre un popup con el nombre y el pictograma de su estación. Los nodos coincidentes pueden recorrerse con clics o toques sucesivos. |
-| **Navegación** | Incluye paneo, zoom suave, rueda, doble clic, gesto de pellizco y restablecimiento de la cámara. |
-| **Contexto territorial** | La vista geográfica incorpora límites administrativos de la CDMX y de los municipios del Estado de México alcanzados por la red. |
-| **Diseño adaptativo** | Funciona en escritorio y dispositivos táctiles, con temas claro y oscuro y respeto por la preferencia de movimiento reducido. |
 
 ## Cobertura
 
@@ -44,8 +32,6 @@ El proyecto representa Metro, Metrobús, Cablebús y Tren Suburbano en un mismo 
 | **Cablebús** | 3 | Líneas 1–3 |
 | **Tren Suburbano** | 1 | Buenavista–Cuautitlán y ramal al AIFA |
 | **Total** | **23** | **4 sistemas** |
-
-El GTFS incorporado corresponde al **24 de febrero de 2026**. La visualización es estática: no muestra posiciones de vehículos, incidencias ni cambios de servicio en tiempo real.
 
 ## Controles
 
@@ -80,7 +66,7 @@ El proceso siguió cuatro pasos:
 
 Por ello, el esquema actual está inspirado directamente en el layout publicado por el gobierno de la CDMX, pero es una reconstrucción adaptada a la interpolación: regulariza distancias y reacomoda distintivos para conservar legibilidad durante la transición hacia la geografía.
 
-Cada estación conserva dos coordenadas: una extraída o reconstruida a partir del esquema oficial y otra derivada de su ubicación geográfica. El deslizador interpola ambas posiciones y actualiza las rutas en SVG. En el esquema, las estaciones se distribuyen de forma regular a lo largo de cada línea; en la geografía, los trazos siguen las formas del GTFS.
+Cada estación conserva dos coordenadas: una extraída o reconstruida a partir del esquema oficial y otra derivada de su ubicación geográfica. El deslizador interpola ambas posiciones y actualiza las rutas en SVG.
 
 Los datos, geometrías e iconos necesarios para la experiencia pública están incorporados en el documento HTML. El navegador no necesita solicitar una API durante la interacción.
 
@@ -115,14 +101,11 @@ La aplicación usa HTML, CSS y JavaScript nativos. El mapa se renderiza con SVG 
 - Los controles incluyen nombres accesibles y estados anunciables para tecnologías de asistencia.
 - Las animaciones respetan `prefers-reduced-motion`.
 - El diseño considera áreas seguras, orientación vertical y horizontal y distintos tamaños de pantalla.
-- La consulta de estaciones depende actualmente de mouse, lápiz o tacto; la navegación completa de nodos mediante teclado todavía no está disponible.
 
 ## Alcance y límites
 
 - La cercanía o longitud de un tramo en el esquema no representa distancia ni tiempo de viaje.
 - La vista geográfica sirve para comparar la red con el territorio; no es un planificador de rutas.
-- El contenido refleja un corte de datos y no se actualiza automáticamente cuando cambian estaciones, trazos u operaciones.
-- Los nombres, logotipos y pictogramas de los sistemas pertenecen a sus respectivos titulares y se muestran únicamente con fines de identificación.
 - El proyecto no está afiliado con el Gobierno de la Ciudad de México, SEMOVI, STC Metro, Metrobús, Cablebús, Ferrocarriles Suburbanos o AIFA.
 
 ## Autor
