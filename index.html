@@ -94,6 +94,62 @@
       text-align: right;
     }
 
+    .site-intro {
+      display: grid;
+      justify-items: end;
+      gap: 0.3rem;
+    }
+
+    .site-credit {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.38rem;
+      color: var(--page-muted);
+      font-size: clamp(0.7rem, 1.2vw, 0.8rem);
+    }
+
+    .site-credit-links {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.28rem;
+    }
+
+    .site-credit a {
+      display: inline-grid;
+      width: 1.35rem;
+      height: 1.35rem;
+      place-items: center;
+      color: var(--page-muted);
+      border-radius: 50%;
+    }
+
+    .site-credit a:hover {
+      color: var(--page-foreground);
+    }
+
+    .site-credit a:focus-visible {
+      color: var(--page-foreground);
+      outline: 2px solid currentColor;
+      outline-offset: 2px;
+    }
+
+    .site-credit svg {
+      display: block;
+      width: 0.95rem;
+      height: 0.95rem;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .site-credit .site-github-icon {
+      fill: currentColor;
+      stroke: none;
+    }
+
     .site-main {
       min-width: 0;
       min-height: 0;
@@ -150,6 +206,14 @@
         text-align: left;
       }
 
+      .site-intro {
+        justify-items: start;
+      }
+
+      .site-credit {
+        justify-content: flex-start;
+      }
+
     }
 
     @media (max-width: 680px) and (orientation: portrait) {
@@ -202,6 +266,14 @@
         margin-top: 0;
         font-size: 0.72rem;
       }
+
+      .site-intro {
+        gap: 0.1rem;
+      }
+
+      .site-credit {
+        font-size: 0.66rem;
+      }
     }
 
     @media (max-width: 680px) and (max-height: 620px) and (orientation: portrait) {
@@ -215,7 +287,25 @@
   <div class="site-shell">
     <header class="site-header">
       <h1>Movilidad Integrada CDMX</h1>
-      <p>Explora el mapa esquemático y su correspondencia con la geografía real</p>
+      <div class="site-intro">
+        <p>Explora el mapa esquemático y su correspondencia con la geografía real</p>
+        <div class="site-credit">
+          <span>Hecho por: Alejandro Romero González</span>
+          <span class="site-credit-links">
+            <a href="https://alejandroromerog.github.io/" target="_blank" rel="noreferrer" aria-label="Sitio personal de Alejandro Romero González">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M3 12h18 M12 3c2.4 2.5 3.6 5.5 3.6 9s-1.2 6.5-3.6 9c-2.4-2.5-3.6-5.5-3.6-9S9.6 5.5 12 3Z"></path>
+              </svg>
+            </a>
+            <a href="https://github.com/AlejandroRomeroG" target="_blank" rel="noreferrer" aria-label="GitHub de Alejandro Romero González">
+              <svg class="site-github-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M12 2.5a9.7 9.7 0 0 0-3.07 18.9c.49.09.67-.21.67-.47v-1.7c-2.73.6-3.3-1.16-3.3-1.16-.45-1.14-1.09-1.44-1.09-1.44-.89-.61.07-.6.07-.6.98.07 1.5 1.01 1.5 1.01.88 1.5 2.3 1.07 2.86.82.09-.64.34-1.07.62-1.32-2.18-.25-4.47-1.09-4.47-4.84 0-1.07.38-1.94 1.01-2.63-.1-.25-.44-1.25.1-2.6 0 0 .82-.26 2.67 1a9.27 9.27 0 0 1 4.86 0c1.85-1.26 2.67-1 2.67-1 .54 1.35.2 2.35.1 2.6.63.69 1.01 1.56 1.01 2.63 0 3.76-2.29 4.58-4.48 4.83.35.31.67.91.67 1.84v2.73c0 .26.18.57.68.47A9.7 9.7 0 0 0 12 2.5Z"></path>
+              </svg>
+            </a>
+          </span>
+        </div>
+      </div>
     </header>
     <main class="site-main">
       <style>
@@ -522,6 +612,15 @@
     filter: none;
   }
 
+  @media (pointer: coarse) {
+    #metro-cdmx-morph .metro-line,
+    #metro-cdmx-morph .metro-b-line,
+    #metro-cdmx-morph .official-schematic-line,
+    #metro-cdmx-morph .mobility-line {
+      filter: none;
+    }
+  }
+
   #metro-cdmx-morph .metro-municipality-label {
     font-family: ui-sans-serif, system-ui, sans-serif;
     font-weight: 500;
@@ -678,7 +777,7 @@
         <path d="M946 72 L956 94 L946 88 L936 94 Z" fill="#d6dce2"></path>
         <text x="946" y="63" text-anchor="middle" fill="#d6dce2" class="metro-map-note" font-size="11">N</text>
       </g>
-      <text x="90" y="55" fill="#d6dce2" class="metro-map-note metro-network-count" font-size="12">23 LÍNEAS · 4 SISTEMAS</text>
+      <text x="115" y="55" fill="#d6dce2" class="metro-map-note metro-network-count" font-size="12">23 LÍNEAS · 4 SISTEMAS</text>
     </svg>
     <button class="metro-theme-button" type="button" aria-label="Cambiar a tema claro" title="Cambiar a tema claro">
       <svg class="metro-theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -939,6 +1038,14 @@
   let renderedZoomPercent = -1;
   let mapScreenInverse = null;
   let wheelEndTimer = 0;
+  const zoomMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+  let zoomAnimationFrame = 0;
+  let zoomAnimationTarget = null;
+  const stationHitSelector = ".metro-station-hit, .mobility-station-hit";
+  const stationTipTargets = new WeakMap();
+  let pinnedTipTarget = null;
+  let visibleTipTarget = null;
+  const mapInteractionKinds = new Set();
 
   function invalidateMapGeometry() {
     mapScreenInverse = null;
@@ -1053,6 +1160,7 @@
   }
 
   function refreshResponsiveCamera() {
+    cancelZoomAnimation();
     updateCameraFrame(currentMorphValue);
   }
 
@@ -1085,26 +1193,92 @@
     if (!zoomRenderFrame) zoomRenderFrame = requestAnimationFrame(renderZoom);
   }
 
-  function applyZoom(nextScale, focus = cameraCenter()) {
+  function zoomTarget(nextScale, focus = cameraCenter()) {
     const scale = clamp(nextScale, 1, 6);
     const contentX = (focus[0] - zoomState.x) / zoomState.scale;
     const contentY = (focus[1] - zoomState.y) / zoomState.scale;
-    zoomState.x = focus[0] - contentX * scale;
-    zoomState.y = focus[1] - contentY * scale;
-    zoomState.scale = scale;
-    clampZoomPosition();
+    const factor = 1 - scale;
+    return {
+      scale,
+      x: clamp(
+        focus[0] - contentX * scale,
+        (cameraFrame.x + cameraFrame.width) * factor,
+        cameraFrame.x * factor
+      ),
+      y: clamp(
+        focus[1] - contentY * scale,
+        (cameraFrame.y + cameraFrame.height) * factor,
+        cameraFrame.y * factor
+      )
+    };
+  }
+
+  function applyZoom(nextScale, focus = cameraCenter()) {
+    Object.assign(zoomState, zoomTarget(nextScale, focus));
     scheduleZoomRender();
+  }
+
+  function cancelZoomAnimation() {
+    if (zoomAnimationFrame) {
+      cancelAnimationFrame(zoomAnimationFrame);
+      zoomAnimationFrame = 0;
+    }
+    zoomAnimationTarget = null;
+    if (mapInteractionKinds.has("zoom-animation")) {
+      endMapInteraction("zoom-animation");
+    }
+  }
+
+  function animateZoom(nextScale, focus = cameraCenter()) {
+    cancelZoomAnimation();
+    hideMapTooltip();
+    const start = { ...zoomState };
+    const target = zoomTarget(nextScale, focus);
+    const distance = Math.abs(target.scale - start.scale)
+      + Math.hypot(target.x - start.x, target.y - start.y) / 1000;
+    if (zoomMotionQuery.matches || distance < 0.0005) {
+      Object.assign(zoomState, target);
+      scheduleZoomRender();
+      return;
+    }
+
+    const startedAt = performance.now();
+    const duration = 240;
+    zoomAnimationTarget = target;
+    beginMapInteraction("zoom-animation");
+
+    function tick() {
+      const progress = zoomMotionQuery.matches
+        ? 1
+        : clamp((performance.now() - startedAt) / duration, 0, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      zoomState.scale = start.scale + (target.scale - start.scale) * eased;
+      zoomState.x = start.x + (target.x - start.x) * eased;
+      zoomState.y = start.y + (target.y - start.y) * eased;
+      scheduleZoomRender();
+
+      if (progress < 1) {
+        zoomAnimationFrame = requestAnimationFrame(tick);
+        return;
+      }
+      zoomAnimationFrame = 0;
+      zoomAnimationTarget = null;
+      Object.assign(zoomState, target);
+      scheduleZoomRender();
+      endMapInteraction("zoom-animation");
+    }
+
+    zoomAnimationFrame = requestAnimationFrame(tick);
   }
 
   zoomButtons.forEach(button => {
     button.addEventListener("click", () => {
-      if (button.dataset.zoom === "reset") applyZoom(1);
-      if (button.dataset.zoom === "in") applyZoom(zoomState.scale * 1.4);
-      if (button.dataset.zoom === "out") applyZoom(zoomState.scale / 1.4);
+      const baseScale = zoomAnimationTarget?.scale ?? zoomState.scale;
+      if (button.dataset.zoom === "reset") animateZoom(1);
+      if (button.dataset.zoom === "in") animateZoom(baseScale * 1.4);
+      if (button.dataset.zoom === "out") animateZoom(baseScale / 1.4);
     });
   });
-
-  const mapInteractionKinds = new Set();
 
   function beginMapInteraction(kind) {
     if (mapInteractionKinds.has(kind)) return;
@@ -1114,19 +1288,68 @@
   }
 
   function endMapInteraction(kind) {
-    mapInteractionKinds.delete(kind);
+    if (!mapInteractionKinds.delete(kind)) return;
     if (mapInteractionKinds.size) return;
     delete stage.dataset.interacting;
     scheduleBadgePositionAnimation();
   }
 
-  function hideMapTooltip() {
+  function hideMapTooltip(clearPinned = true) {
+    if (clearPinned) pinnedTipTarget = null;
+    visibleTipTarget = null;
     tip.classList.remove("is-visible");
     tip.setAttribute("aria-hidden", "true");
   }
 
+  function positionTooltipForTarget(target) {
+    const stageRect = stage.getBoundingClientRect();
+    const hitRect = target.hit.getBoundingClientRect();
+    const width = tip.offsetWidth || 180;
+    const height = tip.offsetHeight || 42;
+    const anchorX = hitRect.left + hitRect.width / 2 - stageRect.left;
+    const anchorY = hitRect.top - stageRect.top;
+    tip.style.left = `${clamp(anchorX, width / 2 + 8, stageRect.width - width / 2 - 8)}px`;
+    tip.style.top = `${clamp(anchorY, height + 14, stageRect.height - 8)}px`;
+  }
+
+  function revealStationTooltip(target, pin = false) {
+    target.render();
+    visibleTipTarget = target;
+    if (pin) pinnedTipTarget = target;
+    positionTooltipForTarget(target);
+  }
+
+  function registerStationTooltip(hit, render) {
+    const target = { hit, render };
+    stationTipTargets.set(hit, target);
+
+    hit.addEventListener("pointerenter", event => {
+      if (event.pointerType !== "mouse" || pinnedTipTarget) return;
+      revealStationTooltip(target);
+    });
+    hit.addEventListener("pointerdown", event => {
+      if (event.pointerType !== "mouse" || event.button !== 0) return;
+      pinnedTipTarget = null;
+      revealStationTooltip(target);
+    });
+    hit.addEventListener("pointerleave", event => {
+      if (event.pointerType !== "mouse") return;
+      if (pinnedTipTarget || visibleTipTarget !== target) return;
+      hideMapTooltip(false);
+    });
+  }
+
+  const tooltipOutsideBoundary = isStandaloneSite ? document : root;
+  tooltipOutsideBoundary.addEventListener("pointerdown", event => {
+    if (!pinnedTipTarget) return;
+    const hit = event.target.closest?.(stationHitSelector);
+    if (!hit) hideMapTooltip();
+  }, true);
+
   svg.addEventListener("wheel", event => {
     event.preventDefault();
+    cancelZoomAnimation();
+    hideMapTooltip();
     beginMapInteraction("wheel");
     window.clearTimeout(wheelEndTimer);
     wheelEndTimer = window.setTimeout(() => {
@@ -1138,7 +1361,10 @@
 
   svg.addEventListener("dblclick", event => {
     event.preventDefault();
-    applyZoom(zoomState.scale * 1.55, clientPointInMap(event.clientX, event.clientY));
+    animateZoom(
+      (zoomAnimationTarget?.scale ?? zoomState.scale) * 1.55,
+      clientPointInMap(event.clientX, event.clientY)
+    );
   });
 
   const activePointers = new Map();
@@ -1165,6 +1391,7 @@
 
     if (pointers.length === 1) {
       const pointer = pointers[0];
+      const continuingPan = !pointer.tapEligible;
       pointerGesture = {
         type: "pan",
         ids: [pointer.id],
@@ -1173,13 +1400,21 @@
         startClientY: pointer.y,
         startX: zoomState.x,
         startY: zoomState.y,
-        moved: false
+        moved: continuingPan
       };
-      stage.dataset.panning = "true";
+      if (continuingPan) {
+        stage.dataset.panning = "true";
+        beginMapInteraction("pointer");
+      } else {
+        delete stage.dataset.panning;
+      }
       delete stage.dataset.pinching;
       return;
     }
 
+    pointers.forEach(pointer => {
+      pointer.tapEligible = false;
+    });
     const first = pointers[0];
     const second = pointers[1];
     const midpoint = pointerMidpoint(first, second);
@@ -1197,6 +1432,7 @@
     };
     delete stage.dataset.panning;
     stage.dataset.pinching = "true";
+    beginMapInteraction("pointer");
     hideMapTooltip();
   }
 
@@ -1207,8 +1443,13 @@
       if (!pointer) return;
       const clientDx = pointer.x - pointerGesture.startClientX;
       const clientDy = pointer.y - pointerGesture.startClientY;
-      if (!pointerGesture.moved && Math.hypot(clientDx, clientDy) > 3) {
+      if (!pointerGesture.moved) {
+        const threshold = pointer.pointerType === "mouse" ? 3 : 8;
+        if (Math.hypot(clientDx, clientDy) <= threshold) return;
         pointerGesture.moved = true;
+        pointer.tapEligible = false;
+        stage.dataset.panning = "true";
+        beginMapInteraction("pointer");
         hideMapTooltip();
       }
       const inverse = pointerGesture.inverse;
@@ -1241,20 +1482,22 @@
 
   svg.addEventListener("pointerdown", event => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
-    if (
-      event.pointerType === "mouse"
-      && event.target.closest(".metro-station-hit, .mobility-station-hit")
-    ) return;
+    const hit = event.target.closest?.(stationHitSelector);
+    const tipTarget = hit ? stationTipTargets.get(hit) || null : null;
+    cancelZoomAnimation();
+    if (event.pointerType === "mouse" && tipTarget) return;
+    if (!tipTarget) hideMapTooltip();
     activePointers.set(event.pointerId, {
       id: event.pointerId,
       x: event.clientX,
       y: event.clientY,
-      pointerType: event.pointerType
+      pointerType: event.pointerType,
+      tapEligible: true,
+      tipTarget
     });
     try {
       svg.setPointerCapture(event.pointerId);
     } catch {}
-    beginMapInteraction("pointer");
     rebasePointerGesture();
     event.preventDefault();
   });
@@ -1268,12 +1511,13 @@
     event.preventDefault();
   });
 
-  function finishPointer(event, releaseCapture = true) {
+  function finishPointer(event, releaseCapture = true, allowTap = true) {
     if (!activePointers.has(event.pointerId)) return;
     const pointer = activePointers.get(event.pointerId);
     pointer.x = event.clientX;
     pointer.y = event.clientY;
     updatePointerGesture();
+    const completedGesture = pointerGesture;
     activePointers.delete(event.pointerId);
     if (releaseCapture && svg.hasPointerCapture(event.pointerId)) {
       try {
@@ -1287,13 +1531,22 @@
       delete stage.dataset.panning;
       delete stage.dataset.pinching;
       endMapInteraction("pointer");
+      const isTouchTap = allowTap
+        && pointer.tapEligible
+        && completedGesture?.type === "pan"
+        && !completedGesture.moved
+        && (pointer.pointerType === "touch" || pointer.pointerType === "pen");
+      if (isTouchTap) {
+        if (pointer.tipTarget) revealStationTooltip(pointer.tipTarget, true);
+        else hideMapTooltip();
+      }
     }
     event.preventDefault();
   }
 
   svg.addEventListener("pointerup", event => finishPointer(event));
-  svg.addEventListener("pointercancel", event => finishPointer(event));
-  svg.addEventListener("lostpointercapture", event => finishPointer(event, false));
+  svg.addEventListener("pointercancel", event => finishPointer(event, true, false));
+  svg.addEventListener("lostpointercapture", event => finishPointer(event, false, false));
   applyZoom(1);
 
   function pathString(points) {
@@ -2254,26 +2507,10 @@
     mobilityStationLayer.appendChild(group);
     station.group = group;
 
-    function moveMobilityTip(event) {
-      const rect = stage.getBoundingClientRect();
-      const width = tip.offsetWidth || 180;
-      const height = tip.offsetHeight || 42;
-      const x = clamp(event.clientX - rect.left, width / 2 + 8, rect.width - width / 2 - 8);
-      const y = clamp(event.clientY - rect.top, height + 14, rect.height - 8);
-      tip.style.left = `${x}px`;
-      tip.style.top = `${y}px`;
-    }
-
-    hit.addEventListener("pointerenter", event => {
+    registerStationTooltip(hit, () => {
       const presentation = mobilityPresentation(station);
       const copy = `${station.name} · ${presentation.name} ${station.lines.join(" · ")}`;
       showTooltip(copy, station, presentation.icon);
-      moveMobilityTip(event);
-    });
-    hit.addEventListener("pointermove", moveMobilityTip);
-    hit.addEventListener("pointerleave", () => {
-      tip.classList.remove("is-visible");
-      tip.setAttribute("aria-hidden", "true");
     });
   });
 
@@ -2298,28 +2535,10 @@
     stationsLayer.appendChild(group);
     station.group = group;
 
-    function showStation(event) {
+    registerStationTooltip(hit, () => {
       const lineText = station.lines.join(" · ");
       const copy = `${station.name} · ${station.lines.length > 1 ? "líneas" : "línea"} ${lineText}`;
       showTooltip(copy, station, "metro");
-      moveTip(event);
-    }
-
-    function moveTip(event) {
-      const rect = stage.getBoundingClientRect();
-      const width = tip.offsetWidth || 180;
-      const height = tip.offsetHeight || 42;
-      const x = clamp(event.clientX - rect.left, width / 2 + 8, rect.width - width / 2 - 8);
-      const y = clamp(event.clientY - rect.top, height + 14, rect.height - 8);
-      tip.style.left = `${x}px`;
-      tip.style.top = `${y}px`;
-    }
-
-    hit.addEventListener("pointerenter", showStation);
-    hit.addEventListener("pointermove", moveTip);
-    hit.addEventListener("pointerleave", () => {
-      tip.classList.remove("is-visible");
-      tip.setAttribute("aria-hidden", "true");
     });
   });
 
@@ -2524,6 +2743,15 @@
 
   function scheduleBadgePositionAnimation() {
     if (stage.dataset.interacting === "true") return;
+    const hasPendingBadges = allBadgeRenderers.some(badge => {
+      if (!badge.targetPosition) return false;
+      if (!badge.displayPosition) return true;
+      return Math.hypot(
+        badge.targetPosition[0] - badge.displayPosition[0],
+        badge.targetPosition[1] - badge.displayPosition[1]
+      ) > 0.01;
+    });
+    if (!hasPendingBadges) return;
     if (reduceBadgeMotion) {
       allBadgeRenderers.forEach(badge => {
         if (badge.targetPosition) setRenderedBadgePosition(badge, badge.targetPosition);
@@ -2916,6 +3144,8 @@
   let sliderUpdateFrame = 0;
   let pendingSliderValue = 0;
   slider.addEventListener("input", event => {
+    cancelZoomAnimation();
+    hideMapTooltip();
     pendingSliderValue = Number(event.target.value) / 100;
     if (sliderUpdateFrame) return;
     sliderUpdateFrame = requestAnimationFrame(() => {
