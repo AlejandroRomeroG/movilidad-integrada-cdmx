@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>Movilidad Integrada de la CDMX</h1>
+  <h1>Red de Movilidad Integrada de la CDMX</h1>
   <p><strong>Una visualización interactiva que conecta el mapa esquemático con la geografía real de la red.</strong></p>
   <p>
     <a href="https://github.com/AlejandroRomeroG/movilidad-integrada-cdmx/actions/workflows/pages/pages-build-deployment"><img alt="GitHub Pages" src="https://github.com/AlejandroRomeroG/movilidad-integrada-cdmx/actions/workflows/pages/pages-build-deployment/badge.svg"></a>
