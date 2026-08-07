@@ -589,20 +589,21 @@
     vector-effect: non-scaling-stroke;
   }
 
-  #metro-cdmx-morph .metro-station-hit {
+  #metro-cdmx-morph .metro-station-hit,
+  #metro-cdmx-morph .mobility-station-hit {
     fill: transparent;
+    pointer-events: none;
+  }
+
+  #metro-cdmx-morph .metro-station-dot,
+  #metro-cdmx-morph .mobility-station-mark {
     cursor: crosshair;
+    pointer-events: visiblePainted;
   }
 
   #metro-cdmx-morph [data-layer="badges"],
   #metro-cdmx-morph [data-layer="mobility-badges"] {
     pointer-events: none;
-  }
-
-  #metro-cdmx-morph .mobility-station-hit {
-    fill: transparent;
-    cursor: crosshair;
-    vector-effect: non-scaling-stroke;
   }
 
   #metro-cdmx-morph .metro-badge-text {
@@ -618,6 +619,10 @@
     font-weight: 500;
     letter-spacing: 0.08em;
     fill: var(--map-note);
+  }
+
+  #metro-cdmx-morph .metro-network-count {
+    letter-spacing: 0.03em;
   }
 
   #metro-cdmx-morph .metro-stage[data-interacting="true"] .metro-line,
@@ -792,7 +797,7 @@
         <path d="M946 72 L956 94 L946 88 L936 94 Z" fill="#d6dce2"></path>
         <text x="946" y="63" text-anchor="middle" fill="#d6dce2" class="metro-map-note" font-size="11">N</text>
       </g>
-      <text x="115" y="55" fill="#d6dce2" class="metro-map-note metro-network-count" font-size="12">23 LÍNEAS · 4 SISTEMAS</text>
+      <text x="25" y="765" fill="#d6dce2" class="metro-map-note metro-network-count" font-size="12">23 líneas · 4 sistemas</text>
     </svg>
     <button class="metro-theme-button" type="button" aria-label="Cambiar a tema claro" title="Cambiar a tema claro">
       <svg class="metro-theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -1054,12 +1059,13 @@
   let renderedZoomPercent = -1;
   let mapScreenMatrix = null;
   let mapScreenInverse = null;
+  let stationScreenGeometryCache = null;
   let wheelEndTimer = 0;
   const zoomMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
   let zoomAnimationFrame = 0;
   let zoomAnimationTarget = null;
-  const stationHitSelector = ".metro-station-hit, .mobility-station-hit";
-  const stationTipTargets = new WeakMap();
+  const stationMarkSelector = ".metro-station-dot, .mobility-station-mark";
+  const stationMarkTargets = new WeakMap();
   const stationTipTargetList = [];
   let stationSelectionCycle = null;
   let pinnedTipTarget = null;
@@ -1069,6 +1075,7 @@
   function invalidateMapGeometry() {
     mapScreenMatrix = null;
     mapScreenInverse = null;
+    stationScreenGeometryCache = null;
   }
 
   function currentMapMatrix() {
@@ -1207,6 +1214,7 @@
       "transform",
       `translate(${zoomState.x.toFixed(2)} ${zoomState.y.toFixed(2)}) scale(${zoomState.scale.toFixed(4)})`
     );
+    stationScreenGeometryCache = null;
     const percent = Math.round(zoomState.scale * 100);
     if (percent !== renderedZoomPercent) {
       renderedZoomPercent = percent;
@@ -1337,7 +1345,7 @@
 
   function positionTooltipForTarget(target) {
     const stageRect = stage.getBoundingClientRect();
-    const hitRect = target.hit.getBoundingClientRect();
+    const hitRect = target.mark.getBoundingClientRect();
     const width = tip.offsetWidth || 180;
     const height = tip.offsetHeight || 42;
     const anchorX = hitRect.left + hitRect.width / 2 - stageRect.left;
@@ -1371,77 +1379,100 @@
     positionTooltipForTarget(target);
   }
 
-  function targetScreenGeometry(target, matrix) {
-    const [stationX, stationY] = target.station.current;
-    const mapX = renderedZoomState.x + stationX * renderedZoomState.scale;
-    const mapY = renderedZoomState.y + stationY * renderedZoomState.scale;
+  function currentStationScreenGeometries() {
+    if (stationScreenGeometryCache) return stationScreenGeometryCache;
+    const matrix = currentMapMatrix();
+    if (!matrix) return [];
     const screenScale = Math.max(
       Math.hypot(matrix.a, matrix.b),
       Math.hypot(matrix.c, matrix.d)
     );
-    return {
-      target,
-      x: matrix.a * mapX + matrix.c * mapY + matrix.e,
-      y: matrix.b * mapX + matrix.d * mapY + matrix.f,
-      radius: target.hitRadius * renderedZoomState.scale * screenScale,
-      visualRadius: target.visualRadius * renderedZoomState.scale * screenScale
-    };
+    stationScreenGeometryCache = stationTipTargetList.map(target => {
+      const [stationX, stationY] = target.station.current;
+      const mapX = renderedZoomState.x + stationX * renderedZoomState.scale;
+      const mapY = renderedZoomState.y + stationY * renderedZoomState.scale;
+      const scale = renderedZoomState.scale * screenScale;
+      const geometry = {
+        target,
+        x: matrix.a * mapX + matrix.c * mapY + matrix.e,
+        y: matrix.b * mapX + matrix.d * mapY + matrix.f
+      };
+      if (target.shape.type === "rect") {
+        geometry.halfWidth = target.shape.halfWidth * scale + target.shape.strokeWidth / 2;
+        geometry.halfHeight = target.shape.halfHeight * scale + target.shape.strokeWidth / 2;
+      } else {
+        geometry.radius = target.shape.radius * scale + target.shape.strokeWidth / 2;
+      }
+      return geometry;
+    });
+    return stationScreenGeometryCache;
+  }
+
+  function pointFallsOnStation(item, clientX, clientY, tolerance = 0) {
+    const dx = clientX - item.x;
+    const dy = clientY - item.y;
+    if (item.target.shape.type === "rect") {
+      return Math.abs(dx) <= item.halfWidth + tolerance
+        && Math.abs(dy) <= item.halfHeight + tolerance;
+    }
+    return Math.hypot(dx, dy) <= item.radius + tolerance;
   }
 
   function stationClusterAt(clientX, clientY, pointerType, fallbackTarget = null) {
-    const matrix = currentMapMatrix();
-    if (!matrix || !stationTipTargetList.length) return null;
-    const geometries = stationTipTargetList.map(target => targetScreenGeometry(target, matrix));
-    const primaryRadius = pointerType === "mouse" ? 10 : 18;
-    const ranked = geometries
-      .map(item => ({ ...item, distance: Math.hypot(item.x - clientX, item.y - clientY) }))
-      .filter(item => item.distance <= Math.max(primaryRadius, item.radius + 3))
-      .sort((first, second) => first.distance - second.distance || second.target.order - first.target.order);
-    let primary = ranked[0] || null;
-    const fallback = fallbackTarget
+    if (pointerType === "mouse" && !fallbackTarget) return null;
+    const tolerance = pointerType === "touch" ? 5 : pointerType === "pen" ? 2 : 0.5;
+    const geometries = currentStationScreenGeometries();
+    let primary = fallbackTarget
       ? geometries.find(item => item.target === fallbackTarget) || null
       : null;
-    if (fallback) {
-      fallback.distance = Math.hypot(fallback.x - clientX, fallback.y - clientY);
-      if (!primary || fallback.distance <= primary.distance + 2) primary = fallback;
+    if (!primary) {
+      primary = geometries
+        .filter(item => pointFallsOnStation(item, clientX, clientY, tolerance))
+        .map(item => ({
+          ...item,
+          pointerDistance: Math.hypot(item.x - clientX, item.y - clientY)
+        }))
+        .sort((first, second) => first.pointerDistance - second.pointerDistance
+          || second.target.order - first.target.order)[0]
+        || null;
     }
     if (!primary) return null;
 
-    const overlapRadius = pointerType === "mouse" ? 2.5 : 3.5;
-    const overlapTolerance = pointerType === "mouse" ? 1 : 1.5;
-    const targets = geometries
+    const candidateTolerance = pointerType === "mouse" ? 0.5 : tolerance;
+    const ranked = geometries
+      .filter(item => item.target === primary.target
+        || pointFallsOnStation(item, clientX, clientY, candidateTolerance)
+        || Math.hypot(item.x - primary.x, item.y - primary.y) <= 1.25)
       .map(item => ({
         ...item,
-        distance: Math.hypot(item.x - primary.x, item.y - primary.y)
+        pointerDistance: Math.hypot(item.x - clientX, item.y - clientY)
       }))
-      .filter(item => item.distance <= Math.max(
-        overlapRadius,
-        primary.visualRadius + item.visualRadius + overlapTolerance
-      ))
       .sort((first, second) => {
         if (first.target === primary.target) return -1;
         if (second.target === primary.target) return 1;
-        return first.distance - second.distance || second.target.order - first.target.order;
-      })
-      .map(item => item.target);
-
-    return { targets, primary: primary.target };
+        return first.pointerDistance - second.pointerDistance
+          || second.target.order - first.target.order;
+      });
+    return {
+      targets: ranked.map(item => item.target),
+      primary: primary.target
+    };
   }
 
   function stationSelectionAt(
     clientX,
     clientY,
     pointerType,
-    fallbackTarget = null,
     frozenCluster = null
   ) {
     const cluster = frozenCluster
-      || stationClusterAt(clientX, clientY, pointerType, fallbackTarget);
+      || stationClusterAt(clientX, clientY, pointerType);
     if (!cluster) return null;
     const key = cluster.targets.map(target => target.key).sort().join("|");
-    const repeatRadius = pointerType === "mouse" ? 12 : 24;
+    const repeatRadius = pointerType === "mouse" ? 3 : pointerType === "pen" ? 4 : 8;
     const repeatsCycle = stationSelectionCycle
       && stationSelectionCycle.key === key
+      && stationSelectionCycle.primaryKey === cluster.primary.key
       && Math.hypot(
         clientX - stationSelectionCycle.clientX,
         clientY - stationSelectionCycle.clientY
@@ -1452,6 +1483,7 @@
       : 0;
     stationSelectionCycle = {
       key,
+      primaryKey: cluster.primary.key,
       targets,
       index,
       clientX: repeatsCycle ? stationSelectionCycle.clientX : clientX,
@@ -1464,14 +1496,12 @@
     clientX,
     clientY,
     pointerType,
-    fallbackTarget = null,
     frozenCluster = null
   ) {
     const selection = stationSelectionAt(
       clientX,
       clientY,
       pointerType,
-      fallbackTarget,
       frozenCluster
     );
     if (!selection) return null;
@@ -1479,27 +1509,39 @@
     return selection.target;
   }
 
-  function registerStationTooltip(hit, render, station, key, visualRadius) {
+  function registerStationTooltip(hit, mark, render, station, key) {
+    const strokeWidth = Number(mark.getAttribute("stroke-width")) || 0;
+    const shape = mark.localName === "rect"
+      ? {
+          type: "rect",
+          halfWidth: Number(mark.getAttribute("width")) / 2,
+          halfHeight: Number(mark.getAttribute("height")) / 2,
+          strokeWidth
+        }
+      : {
+          type: "circle",
+          radius: Number(mark.getAttribute("r")) || 0,
+          strokeWidth
+        };
     const target = {
       hit,
+      mark,
       render,
       station,
       key,
-      hitRadius: Number(hit.getAttribute("r")) || 8,
-      visualRadius,
+      shape,
       order: stationTipTargetList.length
     };
-    stationTipTargets.set(hit, target);
+    stationMarkTargets.set(mark, target);
     stationTipTargetList.push(target);
-
-    hit.addEventListener("pointerenter", event => {
-      if (event.pointerType !== "mouse" || pinnedTipTarget) return;
+    stationScreenGeometryCache = null;
+    mark.addEventListener("pointerenter", event => {
+      if (event.pointerType !== "mouse" || pinnedTipTarget || mapInteractionKinds.size) return;
       revealStationTooltip(target);
     });
-    hit.addEventListener("pointerleave", event => {
-      if (event.pointerType !== "mouse") return;
-      if (pinnedTipTarget || visibleTipTarget !== target) return;
-      hideMapTooltip(false);
+    mark.addEventListener("pointerleave", event => {
+      if (event.pointerType !== "mouse" || pinnedTipTarget) return;
+      if (visibleTipTarget === target) hideMapTooltip(false);
     });
   }
 
@@ -1646,8 +1688,8 @@
 
   svg.addEventListener("pointerdown", event => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
-    const hit = event.target.closest?.(stationHitSelector);
-    const fallbackTarget = hit ? stationTipTargets.get(hit) || null : null;
+    const mark = event.target.closest?.(stationMarkSelector);
+    const fallbackTarget = mark ? stationMarkTargets.get(mark) || null : null;
     const tipCluster = stationClusterAt(
       event.clientX,
       event.clientY,
@@ -1656,11 +1698,6 @@
     );
     const tipTarget = tipCluster?.primary || null;
     cancelZoomAnimation();
-    if (event.pointerType === "mouse" && tipTarget) {
-      selectStationAt(event.clientX, event.clientY, event.pointerType, tipTarget, tipCluster);
-      event.preventDefault();
-      return;
-    }
     if (!tipTarget) hideMapTooltip();
     activePointers.set(event.pointerId, {
       id: event.pointerId,
@@ -1707,18 +1744,19 @@
       delete stage.dataset.panning;
       delete stage.dataset.pinching;
       endMapInteraction("pointer");
-      const isTouchTap = allowTap
+      const isStationTap = allowTap
         && pointer.tapEligible
         && completedGesture?.type === "pan"
         && !completedGesture.moved
-        && (pointer.pointerType === "touch" || pointer.pointerType === "pen");
-      if (isTouchTap) {
+        && (pointer.pointerType === "mouse"
+          || pointer.pointerType === "touch"
+          || pointer.pointerType === "pen");
+      if (isStationTap) {
         if (pointer.tipTarget) {
           selectStationAt(
             pointer.x,
             pointer.y,
             pointer.pointerType,
-            pointer.tipTarget,
             pointer.tipCluster
           );
         }
@@ -2696,15 +2734,11 @@
     mobilityStationLayer.appendChild(group);
     station.group = group;
 
-    registerStationTooltip(hit, () => {
+    registerStationTooltip(hit, mark, () => {
       const presentation = mobilityPresentation(station);
       const copy = `${station.name} · ${presentation.name} ${station.lines.join(" · ")}`;
       showTooltip(copy, station, presentation.icon);
-    }, station, `${station.system}:${station.id}`, station.system === "cablebus"
-      ? 4
-      : station.system === "suburbano"
-        ? 3.25
-        : 1.9);
+    }, station, `${station.system}:${station.id}`);
   });
 
   const stationsLayer = root.querySelector('[data-layer="stations"]');
@@ -2728,11 +2762,11 @@
     stationsLayer.appendChild(group);
     station.group = group;
 
-    registerStationTooltip(hit, () => {
+    registerStationTooltip(hit, dot, () => {
       const lineText = station.lines.join(" · ");
       const copy = `${station.name} · ${station.lines.length > 1 ? "líneas" : "línea"} ${lineText}`;
       showTooltip(copy, station, "metro");
-    }, station, `metro:${station.id}`, station.interchange ? 5.1 : 2.35);
+    }, station, `metro:${station.id}`);
   });
 
   function readableTextColor(hex) {
@@ -3285,6 +3319,7 @@
       station.current[1] = station.schematic[1] + (station.geo[1] - station.schematic[1]) * t;
       station.group.setAttribute("transform", `translate(${station.current[0].toFixed(2)} ${station.current[1].toFixed(2)})`);
     });
+    stationScreenGeometryCache = null;
 
     const currentRoutePolylines = [];
     mobilityRouteRenderers.forEach(renderer => {
